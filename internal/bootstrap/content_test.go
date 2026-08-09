@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -116,6 +117,95 @@ func frontmatterDescription(t *testing.T, doc string) string {
 		t.Fatal("quoted description line missing from frontmatter")
 	}
 	return m[1]
+}
+
+// skillDirs returns the sorted names of the directories directly under root
+// that contain a SKILL.md, walked over the embedded assets FS.
+func skillDirs(t *testing.T, root string) []string {
+	t.Helper()
+	var dirs []string
+	err := fs.WalkDir(assetsFS, root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == root || !d.IsDir() {
+			return nil
+		}
+		if _, statErr := fs.Stat(assetsFS, path+"/SKILL.md"); statErr == nil {
+			dirs = append(dirs, strings.TrimPrefix(path, root+"/"))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", root, err)
+	}
+	sort.Strings(dirs)
+	return dirs
+}
+
+// referenceFiles returns the sorted relative names of the files under
+// root/references/ (empty when the skill ships no references/ subtree).
+func referenceFiles(t *testing.T, root string) []string {
+	t.Helper()
+	if _, err := fs.Stat(assetsFS, root+"/references"); err != nil {
+		return nil
+	}
+	var refs []string
+	err := fs.WalkDir(assetsFS, root+"/references", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		refs = append(refs, strings.TrimPrefix(path, root+"/references/"))
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", root+"/references", err)
+	}
+	sort.Strings(refs)
+	return refs
+}
+
+// checkFrontmatter validates one SKILL.md against the pinned OpenCode 1.18.15
+// rules (R2): name matching ^[a-z0-9]+(-[a-z0-9]+)*$, optional match with the
+// containing directory name, and description 1-1024 chars.
+func checkFrontmatter(t *testing.T, dir, doc string, requireDirMatch bool) {
+	t.Helper()
+	m := regexp.MustCompile(`(?m)^name: ([a-z0-9-]+)$`).FindStringSubmatch(doc)
+	if m == nil {
+		t.Fatalf("%s: frontmatter name missing", dir)
+	}
+	name := m[1]
+	if !regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`).MatchString(name) {
+		t.Fatalf("%s: name %q violates ^[a-z0-9]+(-[a-z0-9]+)*$", dir, name)
+	}
+	if requireDirMatch && name != dir {
+		t.Fatalf("%s: frontmatter name %q != containing directory name", dir, name)
+	}
+	if desc := frontmatterDescription(t, doc); len(desc) < 1 || len(desc) > 1024 {
+		t.Fatalf("%s: description must be 1-1024 chars", dir)
+	}
+}
+
+// checkDisclosure asserts progressive disclosure (R3) for one skill: every
+// file under its references/ subtree must be named in the SKILL.md body,
+// non-empty, and routed to .agent-ready/ per design D2.
+func checkDisclosure(t *testing.T, dir, doc, root string) {
+	t.Helper()
+	for _, ref := range referenceFiles(t, root) {
+		if !strings.Contains(doc, "references/"+ref) {
+			t.Fatalf("%s: body must name references/%s (progressive disclosure R3)", dir, ref)
+		}
+		rel := strings.TrimPrefix(root, "assets/") + "/references/" + ref
+		if readAsset(t, root+"/references/"+ref) == "" {
+			t.Fatalf("%s references/%s is empty", dir, ref)
+		}
+		if want := filepath.FromSlash(".agent-ready/" + rel); mustRoute(t, rel) != want {
+			t.Fatalf("route(%s) != %q", rel, want)
+		}
+	}
 }
 
 // TestSkillCreatorReviewerContent locks the PR3 skill pair (R4/R6): both
@@ -423,5 +513,37 @@ func TestResearchDesignEvolutionContent(t *testing.T) {
 		if !strings.Contains(syncFlow, marker) {
 			t.Fatalf("sync-flow missing %q", marker)
 		}
+	}
+}
+
+// TestFullSuiteFrontmatterAndProgressiveDisclosure locks the full-suite
+// contract (R2, R3): the harness ships exactly seven skills (R1), every
+// shipped skill frontmatter validates against the pinned OpenCode 1.18.15
+// rules (name pattern ^[a-z0-9]+(-[a-z0-9]+)*$, name == containing directory,
+// description 1-1024 chars), and every skill progressively discloses (R3): all
+// references/ files are named in the body, non-empty, and routed per design
+// D2. The examples subtree is validated for name pattern and description only;
+// directory-name matching is excluded there by design (examples demonstrate
+// skills whose frontmatter names differ from their demo directories).
+func TestFullSuiteFrontmatterAndProgressiveDisclosure(t *testing.T) {
+	shipped := skillDirs(t, "assets/skills")
+	if len(shipped) != 7 {
+		t.Fatalf("harness must ship exactly 7 skills, found %d: %v", len(shipped), shipped)
+	}
+	for _, dir := range shipped {
+		rel := "skills/" + dir + "/SKILL.md"
+		doc := readAsset(t, "assets/"+rel)
+		if want := filepath.FromSlash(".agent-ready/" + rel); mustRoute(t, rel) != want {
+			t.Fatalf("route(%s) != %q", rel, want)
+		}
+		checkFrontmatter(t, dir, doc, true)
+		checkDisclosure(t, dir, doc, "assets/skills/"+dir)
+	}
+
+	// Examples subtree: name pattern + description bounds only, no dir-match.
+	for _, dir := range skillDirs(t, "assets/references/skill-system/examples") {
+		doc := readAsset(t, "assets/references/skill-system/examples/"+dir+"/SKILL.md")
+		checkFrontmatter(t, dir, doc, false)
+		checkDisclosure(t, dir, doc, "assets/references/skill-system/examples/"+dir)
 	}
 }

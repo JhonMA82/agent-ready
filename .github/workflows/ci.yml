@@ -24,7 +24,7 @@ jobs:
           go-version-file: go.mod
       - name: Install the exact supported OpenCode release
         run: npm install --global opencode-ai@1.18.15
-      - name: Prove repository-local config compatibility
+      - name: Full-suite resolution smoke with pinned OpenCode 1.18.15
         run: |
           test "$(opencode --version)" = "1.18.15"
           go build -o "$RUNNER_TEMP/agent-ready" ./cmd/agent-ready
@@ -35,6 +35,12 @@ jobs:
           export XDG_CONFIG_HOME="$RUNNER_TEMP/xdg"
           mkdir "$HOME" "$XDG_CONFIG_HOME"
           (cd "$repo" && "$RUNNER_TEMP/agent-ready" init --json)
+          # Full-suite install (R1): exactly the seven harness skills.
+          installed="$(find "$repo/.agent-ready/skills" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | paste -sd ' ' -)"
+          test "$installed" = "agent-ready-orchestrator artifact-design incremental-evolution repository-analysis skill-creator skill-reviewer targeted-research"
+          # Resolution smoke: the pinned runtime loads the project config, the
+          # skills path resolves, and the agent-ready command is registered.
           (cd "$repo" && opencode debug config > "$RUNNER_TEMP/config.json")
-          node -e 'const c=JSON.parse(require("fs").readFileSync(process.argv[1])); if (!c.skills?.paths?.includes("./.agent-ready/skills")) process.exit(1)' "$RUNNER_TEMP/config.json"
+          node -e 'const c=JSON.parse(require("fs").readFileSync(process.argv[1])); if (!c.skills?.paths?.includes("./.agent-ready/skills")) process.exit(1); if (!c.command?.["agent-ready"]) process.exit(2)' "$RUNNER_TEMP/config.json"
+          # No model/agent/subtask override keys in the installed command (R7).
           ! grep -Eq '^(model|agent|subtask):' "$repo/.opencode/commands/agent-ready.md"
