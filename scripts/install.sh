@@ -8,6 +8,14 @@ REPO="JhonMA82/agent-ready"
 VERSION="${VERSION:-latest}"
 PREFIX="${PREFIX:-$HOME/.local}"
 ASSET_URL="${ASSET_URL:-}"
+# Private repositories require a token (GITHUB_TOKEN/GH_TOKEN); public
+# releases work without one.
+AUTH=()
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+  AUTH=(-H "Authorization: Bearer $GITHUB_TOKEN")
+elif [ -n "${GH_TOKEN:-}" ]; then
+  AUTH=(-H "Authorization: Bearer $GH_TOKEN")
+fi
 
 usage() {
   echo "Usage: VERSION=<semver> PREFIX=<dir> [ASSET_URL=<url>] $0 [--asset-url <url>]" >&2
@@ -39,7 +47,7 @@ esac
 # 'latest' resolves the newest release tag via the GitHub API, then downloads
 # the versioned asset from that tag (goreleaser emits versioned names).
 if [ "$VERSION" = "latest" ]; then
-  TAG="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | head -n1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
+  TAG="$(curl -fsSL "${AUTH[@]}" "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | head -n1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
   if [ -z "$TAG" ]; then
     echo "Could not resolve the latest release tag; set VERSION explicitly." >&2
     exit 1
@@ -54,8 +62,8 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 echo "Downloading $BASE/$ASSET"
-curl -fL -o "$TMP/$ASSET" "$BASE/$ASSET"
-curl -fL -o "$TMP/checksums.txt" "$BASE/checksums.txt"
+curl -fL "${AUTH[@]}" -o "$TMP/$ASSET" "$BASE/$ASSET"
+curl -fL "${AUTH[@]}" -o "$TMP/checksums.txt" "$BASE/checksums.txt"
 
 # Fail closed on checksum mismatch: nothing is installed. The checksums.txt
 # line may carry a relative or absolute asset path; compare hashes directly.

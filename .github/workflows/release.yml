@@ -65,6 +65,7 @@ jobs:
           WORK="$(mktemp -d)"
           VERSION="${TAG#v}" PREFIX="$PREFIX" \
             ASSET_URL="https://github.com/JhonMA82/agent-ready/releases/download/${TAG}" \
+            GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
             ./scripts/install.sh
           test -x "$PREFIX/bin/agent-ready"
           "$PREFIX/bin/agent-ready" --version | grep -q "agent-ready ${VERSION}"
