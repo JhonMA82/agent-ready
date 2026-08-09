@@ -1,0 +1,7 @@
+plan:
+  stages:
+    - inventory
+    - entrypoints
+    - domains
+  unknowns:
+    - dependency update cadence
