@@ -23,3 +23,16 @@ shapes. Evidence is asserted by content, never by counts alone:
 Fixtures H–P (resume, isolation, degradation, decision-evidence) arrive with
 PR12; O (lifecycle approval flows) is deliberately absent per the
 specification deferral.
+
+## PR12 additions
+
+| ID | Fixture | Evidence class (spec 26 / 40) | Seeded evidence |
+|---|---|---|---|
+| H | ask-user | ASK_USER after no-new-evidence iterations | seeded `decisions.jsonl` ASK_USER record |
+| I | stop-with-concerns | STOP_WITH_CONCERNS + recorded reasons | seeded `decisions.jsonl` STOP_WITH_CONCERNS record |
+| J | incremental-sync | selective update, changed paths only | seeded UPDATE record, no full re-audit marker |
+| K | no-action-sync | NO_ACTION, zero artifacts | seeded NO_ACTION record; absent `.opencode/` |
+| L | resume | stage-3 checkpoint, unchanged sources -> resume, no re-collection | checkpoints built by the harness via `checkpoint save` |
+| M | isolation | no global writes; trees byte-identical | snapshot equality around read-only helpers |
+| N | tool-degradation | no Tool Manager -> capability reasoning, no block | seeded capability-reasoning record |
+| P | decision-evidence | decisions.jsonl/provenance.jsonl record every decision + rationale | seeded decisions + provenance records |
