@@ -48,6 +48,8 @@ release:
     name: agent-ready
   draft: false
   prerelease: auto
+  extra_files:
+    - glob: scripts/install.sh
 
 changelog:
   sort: asc

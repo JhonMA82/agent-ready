@@ -7,12 +7,14 @@ Install the binary, bootstrap a repository, and run your first audit.
 Choose one of the options below (details in [INSTALL.md](../INSTALL.md)).
 
 ```sh
-# Option A — repository installer script (Linux/macOS): clone the repo (or
-# fetch scripts/install.sh) and run it. It downloads the release asset,
-# verifies the sha256 checksum, and installs to $PREFIX/bin (default ~/.local/bin).
+# Option A — one-liner: fetches the installer from the latest release
+curl -fsSL https://github.com/JhonMA82/agent-ready/releases/latest/download/install.sh | sh
+
+# Option B — installer script from a checkout: verifies the sha256 checksum,
+# installs to $PREFIX/bin (default ~/.local/bin).
 VERSION=latest PREFIX=$HOME/.local ./scripts/install.sh
 
-# Option B — manual: download the asset for your platform from the release
+# Option C — manual: download the asset for your platform from the release
 # page, verify checksums.txt, extract, and add the binary to PATH.
 ```
 

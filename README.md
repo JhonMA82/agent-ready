@@ -25,7 +25,30 @@ Expected result: `agent-ready init` creates `.agent-ready/` and registers the `/
 
 **Requirements:** Git · OpenCode 1.18.15 (pinned) · Linux, macOS, or Windows (WSL for the script).
 
-### Option A — installer script (Linux/macOS, recommended)
+### Option A — one-liner (Linux/macOS)
+
+Copy-paste into your terminal:
+
+```sh
+curl -fsSL https://github.com/JhonMA82/agent-ready/releases/latest/download/install.sh | sh
+```
+
+This fetches the installer from the latest release and runs it with defaults (`~/.local/bin`, latest version). The installer verifies the sha256 checksum of the binary before installing anything — a mismatch aborts with nothing installed. As with any piped installer, you can review the script first:
+
+```sh
+curl -fsSL https://github.com/JhonMA82/agent-ready/releases/latest/download/install.sh | less
+```
+
+> **Private repository note:** while the repo is private, release downloads require authentication, so the plain one-liner returns 404. Use the authenticated variant below, or make the repository public to unlock pure copy-paste.
+
+```sh
+# Private-repo variant (uses the GitHub API asset endpoint):
+# set GITHUB_TOKEN first, then:
+curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
+  "https://api.github.com/repos/JhonMA82/agent-ready/releases/assets/$(curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/JhonMA82/agent-ready/releases/latest | grep -B2 '"name": "install.sh"' | grep '"id"' | head -n1 | sed 's/.*"id": *\([0-9]*\).*/\1/')" | sh
+```
+
+### Option B — installer script from a checkout
 
 The installer lives in this repository at `scripts/install.sh`. It downloads the release asset for your platform, verifies the sha256 checksum (fails closed on mismatch), and installs to `$PREFIX/bin` (default `~/.local/bin`). It never requires sudo.
 
@@ -46,7 +69,7 @@ After installing, add the prefix to your PATH if it isn't there:
 export PATH="$HOME/.local/bin:$PATH"   # add to your shell profile
 ```
 
-### Option B — manual install from a release
+### Option C — manual install from a release
 
 1. Open the [releases page](https://github.com/JhonMA82/agent-ready/releases) and download the asset for your platform, e.g. `agent-ready_0.1.0_linux_amd64.tar.gz` (or `.zip` on Windows), plus `checksums.txt`.
 2. Verify the checksum before installing:

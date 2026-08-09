@@ -11,14 +11,27 @@ the repository it runs in (spec acceptance A and Q).
 - Git
 - OpenCode 1.18.15 (pinned compatibility version)
 
-## Option 1: Release script (Linux/macOS)
+## Option 1: One-liner (Linux/macOS)
+
+```sh
+curl -fsSL https://github.com/JhonMA82/agent-ready/releases/latest/download/install.sh | sh
+```
+
+Fetches the installer from the latest release and installs to `~/.local/bin`
+with default settings. The installer verifies the sha256 checksum before
+installing anything; a mismatch aborts with nothing installed. Review first
+with `... | less` if you prefer. While the repository is private, downloads
+require a token — see the authenticated variant in the README or use
+Option 2 from a checkout.
+
+## Option 2: Installer script from a checkout
 
 ```sh
 # Install the latest release into ~/.local/bin
 VERSION=latest PREFIX=$HOME/.local ./scripts/install.sh
 
 # Or a specific release
-VERSION=1.0.0 PREFIX=$HOME/.local ./scripts/install.sh
+VERSION=v0.1.1 PREFIX=$HOME/.local ./scripts/install.sh
 
 # The script verifies the sha256 checksum before installing anything;
 # a mismatch aborts with nothing installed.
@@ -29,7 +42,7 @@ verifies the hash, and installs to `$PREFIX/bin/agent-ready`. It never
 requires sudo; for a system-wide install, run with `PREFIX=/usr/local` under
 your own privilege mechanism.
 
-## Option 2: Manual install
+## Option 3: Manual install
 
 1. Open the release page and download the asset for your platform:
    `agent-ready_<version>_<os>_<arch>.tar.gz` (or `.zip` on Windows).
