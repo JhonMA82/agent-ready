@@ -90,3 +90,114 @@ func TestSkillQualityRubricContent(t *testing.T) {
 		}
 	}
 }
+
+func readAsset(t *testing.T, rel string) string {
+	t.Helper()
+	data, err := fs.ReadFile(assetsFS, rel)
+	if err != nil {
+		t.Fatalf("read %s: %v", rel, err)
+	}
+	return string(data)
+}
+
+func mustRoute(t *testing.T, rel string) string {
+	t.Helper()
+	target, err := route(rel)
+	if err != nil {
+		t.Fatalf("route %s: %v", rel, err)
+	}
+	return target
+}
+
+func frontmatterDescription(t *testing.T, doc string) string {
+	t.Helper()
+	m := regexp.MustCompile(`(?m)^description: "([^"]+)"`).FindStringSubmatch(doc)
+	if m == nil {
+		t.Fatal("quoted description line missing from frontmatter")
+	}
+	return m[1]
+}
+
+// TestSkillCreatorReviewerContent locks the PR3 skill pair (R4/R6): both
+// skills are embedded and routed to .agent-ready/skills/, frontmatter is
+// valid for the pinned runtime, the creator never decides necessity, the
+// reviewer is the mandatory acceptance gate, and each skill's reference
+// resolves per design D2.
+func TestSkillCreatorReviewerContent(t *testing.T) {
+	namePattern := regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+	for _, name := range []string{"skill-creator", "skill-reviewer"} {
+		rel := "skills/" + name + "/SKILL.md"
+		doc := readAsset(t, "assets/"+rel)
+		if want := filepath.FromSlash(".agent-ready/" + rel); mustRoute(t, rel) != want {
+			t.Fatalf("route(%s) != %q", rel, want)
+		}
+		if !strings.Contains(doc, "name: "+name) {
+			t.Fatalf("%s: frontmatter name missing", name)
+		}
+		if !namePattern.MatchString(name) {
+			t.Fatalf("%s: name pattern violation", name)
+		}
+		if desc := frontmatterDescription(t, doc); len(desc) < 1 || len(desc) > 250 || !strings.HasPrefix(desc, "Trigger:") {
+			t.Fatalf("%s: description must be 1-250 chars and trigger-first", name)
+		}
+	}
+	if creator := readAsset(t, "assets/skills/skill-creator/SKILL.md"); !strings.Contains(creator, "Never decide necessity") {
+		t.Fatal("skill-creator must never decide necessity (R4)")
+	}
+	if reviewer := readAsset(t, "assets/skills/skill-reviewer/SKILL.md"); !strings.Contains(reviewer, "mandatory gate") {
+		t.Fatal("skill-reviewer must be the mandatory acceptance gate (R6)")
+	}
+	for _, rel := range []string{
+		"skills/skill-creator/references/authoring-procedure.md",
+		"skills/skill-reviewer/references/review-procedure.md",
+	} {
+		if readAsset(t, "assets/"+rel) == "" {
+			t.Fatalf("%s is empty", rel)
+		}
+		if want := filepath.FromSlash(".agent-ready/" + rel); mustRoute(t, rel) != want {
+			t.Fatalf("route(%s) != %q", rel, want)
+		}
+	}
+}
+
+// TestCanonicalExamplesContent locks the PR3 canonical examples (R6): all
+// four are embedded with SKILL.md + NOTES.md and routed under
+// references/skill-system/examples/ (D2); the excellent pair demonstrates
+// PASS-level calibration (trigger-first, resolving references), and the bad
+// pair documents its own REJECT score sheet.
+func TestCanonicalExamplesContent(t *testing.T) {
+	for _, name := range []string{"excellent-simple", "excellent-complex", "bad-generic", "unnecessary-skill"} {
+		for _, file := range []string{"SKILL.md", "NOTES.md"} {
+			rel := "references/skill-system/examples/" + name + "/" + file
+			if readAsset(t, "assets/"+rel) == "" {
+				t.Fatalf("%s is empty", rel)
+			}
+			if want := filepath.FromSlash(".agent-ready/" + rel); mustRoute(t, rel) != want {
+				t.Fatalf("route(%s) != %q", rel, want)
+			}
+		}
+	}
+	simple := readAsset(t, "assets/references/skill-system/examples/excellent-simple/SKILL.md")
+	if desc := frontmatterDescription(t, simple); !strings.HasPrefix(desc, "Trigger:") {
+		t.Fatal("excellent-simple description must be trigger-first")
+	}
+	complex := readAsset(t, "assets/references/skill-system/examples/excellent-complex/SKILL.md")
+	if !strings.Contains(complex, "references/checklist.md") {
+		t.Fatal("excellent-complex must load its checklist on demand")
+	}
+	if readAsset(t, "assets/references/skill-system/examples/excellent-complex/references/checklist.md") == "" {
+		t.Fatal("excellent-complex checklist is empty")
+	}
+	bad := readAsset(t, "assets/references/skill-system/examples/bad-generic/NOTES.md")
+	for _, marker := range []string{"REJECT", "30"} {
+		if !strings.Contains(bad, marker) {
+			t.Fatalf("bad-generic NOTES.md missing %q", marker)
+		}
+	}
+	unnecessary := readAsset(t, "assets/references/skill-system/examples/unnecessary-skill/NOTES.md")
+	for _, marker := range []string{"duplicates", "REJECT", "NO_ACTION"} {
+		if !strings.Contains(unnecessary, marker) {
+			t.Fatalf("unnecessary-skill NOTES.md missing %q", marker)
+		}
+	}
+}
