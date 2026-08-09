@@ -153,7 +153,41 @@ func main() {
 		}
 		return facts, nil
 	}}
-	if err := cli.NewRootWithCommands(run, update, inspect, validate, ckpt, changes, state, toolsCmd, status, doctor).Execute(); err != nil {
+	remove := func(ctx context.Context, options cli.Options) plan.Result {
+		selection, err := repository.Discover(ctx, "", "git")
+		if err != nil {
+			return refusedLifecycle("", "repository", options.DryRun, err)
+		}
+		if options.Mode == "" {
+			return refusedLifecycle(selection.Root, "mode", options.DryRun, errors.New("--mode is required: harness-only or harness+generated"))
+		}
+		p, err := lifecycle.PlanRemove(selection.Root, lifecycle.Mode(options.Mode))
+		if err != nil {
+			return refusedLifecycle(selection.Root, "plan", options.DryRun, err)
+		}
+		actions := make([]plan.Action, 0, len(p.Removed)+len(p.Kept))
+		for _, entry := range p.Removed {
+			actions = append(actions, plan.Action{Kind: "remove", Path: entry.Path})
+		}
+		for _, entry := range p.Kept {
+			actions = append(actions, plan.Action{Kind: "kept", Path: entry.Path})
+		}
+		if options.DryRun {
+			return plan.NewResult(selection.Root, plan.DryRun, true, actions)
+		}
+		if len(p.Removed) == 0 {
+			return plan.NewResult(selection.Root, plan.Noop, false, actions)
+		}
+		if err := lifecycle.ApplyRemove(p); err != nil {
+			r := plan.NewResult(selection.Root, plan.CommitFailed, false, actions)
+			r.Refusal = &plan.Refusal{Category: "commit", Message: err.Error(), Remediation: "resolve the removal error and retry"}
+			return r
+		}
+		r := plan.NewResult(selection.Root, plan.Changed, false, actions)
+		r.NextStep = "/agent-ready (not initialized)"
+		return r
+	}
+	if err := cli.NewRootWithCommands(run, update, remove, inspect, validate, ckpt, changes, state, toolsCmd, status, doctor).Execute(); err != nil {
 		if exit, ok := err.(cli.ExitError); ok {
 			os.Exit(exit.Code)
 		}

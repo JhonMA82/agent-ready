@@ -17,6 +17,7 @@ type Options struct {
 	Stage    string // checkpoint save --stage
 	Complete bool   // checkpoint save --complete
 	Tool     string // tools install --tool
+	Mode     string // remove --mode
 }
 type Runner func(context.Context, Options) plan.Result
 
@@ -38,12 +39,12 @@ func (e ExitError) Error() string { return fmt.Sprintf("exit status %d", e.Code)
 // the helper exit-code contract (0 success / 1 failure); helpers with Subs
 // become parent commands (e.g. checkpoint save/status).
 func NewRoot(run Runner, helpers ...Helper) *cobra.Command {
-	return NewRootWithCommands(run, nil, helpers...)
+	return NewRootWithCommands(run, nil, nil, helpers...)
 }
 
 // NewRootWithCommands additionally wires lifecycle commands such as update
-// (plan.Result semantics, --dry-run) alongside init.
-func NewRootWithCommands(run Runner, update Runner, helpers ...Helper) *cobra.Command {
+// and remove (plan.Result semantics, --dry-run) alongside init.
+func NewRootWithCommands(run Runner, update Runner, remove Runner, helpers ...Helper) *cobra.Command {
 	root := &cobra.Command{Use: "agent-ready", Short: "Prepare a repository for agent-ready workflows", SilenceErrors: true, SilenceUsage: true}
 	var options Options
 	init := &cobra.Command{Use: "init", Short: "Initialize the containing repository", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
@@ -73,6 +74,22 @@ func NewRootWithCommands(run Runner, update Runner, helpers ...Helper) *cobra.Co
 		upd.Flags().BoolVar(&options.DryRun, "dry-run", false, "show the plan without writing")
 		upd.Flags().BoolVar(&options.JSON, "json", false, "render one JSON result")
 		root.AddCommand(upd)
+	}
+	if remove != nil {
+		rm := &cobra.Command{Use: "remove", Short: "Remove the local harness", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+			r := remove(cmd.Context(), options)
+			if err := Render(cmd.OutOrStdout(), r, options.JSON); err != nil {
+				return err
+			}
+			if code := plan.ExitCode(r); code != 0 {
+				return ExitError{Code: code}
+			}
+			return nil
+		}}
+		rm.Flags().StringVar(&options.Mode, "mode", "", "removal mode: harness-only or harness+generated")
+		rm.Flags().BoolVar(&options.DryRun, "dry-run", false, "show the plan without writing")
+		rm.Flags().BoolVar(&options.JSON, "json", false, "render one JSON result")
+		root.AddCommand(rm)
 	}
 	for _, helper := range helpers {
 		if len(helper.Subs) > 0 {
