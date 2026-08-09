@@ -146,3 +146,16 @@ func TestDoctorHelperExitContract(t *testing.T) {
 		t.Fatalf("facts on stdout (%q) and reason on stderr (%q) required", out.String(), errOut.String())
 	}
 }
+
+func TestVersionFlagContract(t *testing.T) {
+	var out bytes.Buffer
+	cmd := NewRoot(func(context.Context, Options) plan.Result { return plan.NewResult("/repo", plan.Noop, false, nil) })
+	cmd.SetArgs([]string{"--version"})
+	cmd.SetOut(&out)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("--version: %v", err)
+	}
+	if !strings.Contains(out.String(), "agent-ready") {
+		t.Fatalf("--version output: %q", out.String())
+	}
+}

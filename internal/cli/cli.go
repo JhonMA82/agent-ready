@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/JhonMA82/agent-ready/internal/plan"
+	"github.com/JhonMA82/agent-ready/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -46,6 +47,8 @@ func NewRoot(run Runner, helpers ...Helper) *cobra.Command {
 // and remove (plan.Result semantics, --dry-run) alongside init.
 func NewRootWithCommands(run Runner, update Runner, remove Runner, helpers ...Helper) *cobra.Command {
 	root := &cobra.Command{Use: "agent-ready", Short: "Prepare a repository for agent-ready workflows", SilenceErrors: true, SilenceUsage: true}
+	root.Version = version.String()
+	root.SetVersionTemplate("{{.Version}}\n")
 	var options Options
 	init := &cobra.Command{Use: "init", Short: "Initialize the containing repository", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		r := run(cmd.Context(), options)
