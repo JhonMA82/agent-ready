@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"github.com/JhonMA82/agent-ready/internal/plan"
 	"strings"
 	"testing"
@@ -47,5 +49,33 @@ func TestRenderContract(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), `"invocation":"/repo/a"`) {
 		t.Fatalf("nested invocation missing: %s", out.String())
+	}
+}
+
+type summaryFacts struct{ Total int }
+
+func (s summaryFacts) Summary() string { return fmt.Sprintf("files: %d", s.Total) }
+
+func TestHelperContracts(t *testing.T) {
+	helper := Helper{Name: "inspect", Run: func(context.Context, Options) (any, error) { return summaryFacts{Total: 3}, nil }}
+	for _, tt := range []struct {
+		args []string
+		want string
+	}{{[]string{"inspect"}, "files: 3\n"}, {[]string{"inspect", "--json"}, `"Total":3`}} {
+		var out bytes.Buffer
+		cmd := NewRoot(nil, helper)
+		cmd.SetArgs(tt.args)
+		cmd.SetOut(&out)
+		if err := cmd.Execute(); err != nil || !strings.Contains(out.String(), tt.want) {
+			t.Fatalf("output %q, error %v", out.String(), err)
+		}
+	}
+	cmd := NewRoot(nil, Helper{Name: "inspect", Run: func(context.Context, Options) (any, error) { return nil, errors.New("preflight failed") }})
+	cmd.SetArgs([]string{"inspect"})
+	var errOut bytes.Buffer
+	cmd.SetErr(&errOut)
+	err := cmd.Execute()
+	if exit, ok := err.(ExitError); !ok || exit.Code != 1 || !strings.Contains(errOut.String(), "preflight failed") {
+		t.Fatalf("expected ExitError{1} with reason on stderr, got %v / %q", err, errOut.String())
 	}
 }

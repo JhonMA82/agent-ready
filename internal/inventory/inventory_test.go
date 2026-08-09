@@ -1,0 +1,105 @@
+package inventory
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func write(t *testing.T, root, rel, data string) {
+	t.Helper()
+	full := filepath.Join(root, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(full, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// fixtureRepo exercises every fact family: gomod/npm manifests, scripts,
+// workspaces, CI config, nested files, ext-less/uppercase extensions, .git.
+func fixtureRepo(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	write(t, root, "go.mod", "module example.com/demo\n\ngo 1.24\n\nrequire (\n\tgithub.com/spf13/cobra v1.9.1\n\tgithub.com/tailscale/hujson v0.0.0-20260718110524-10d7940d4c87 // indirect\n)\n\nrequire github.com/sirupsen/logrus v1.9.3\n")
+	write(t, root, "package.json", `{"name":"demo","dependencies":{"lodash":"4.17.21"},"devDependencies":{"jest":"29.0.0"},"scripts":{"build":"tsc","test":"jest --ci"},"workspaces":["packages/*","libs/a"]}`)
+	write(t, root, ".github/workflows/ci.yml", "name: ci\n")
+	write(t, root, "cmd/main.go", "package main\n")
+	write(t, root, "README.md", "# demo\n")
+	write(t, root, "LICENSE", "MIT\n")
+	write(t, root, "assets/logo.PNG", "x")
+	write(t, root, ".git/HEAD", "ref: refs/heads/main\n")
+	return root
+}
+
+func TestInspectFacts(t *testing.T) {
+	root := fixtureRepo(t)
+	facts, err := Inspect(root, filepath.Join(root, "nested"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if facts.SchemaVersion != SchemaVersion || facts.Root != root || facts.Invocation != filepath.Join(root, "nested") {
+		t.Fatalf("header mismatch: %+v", facts)
+	}
+	if got, want := fmt.Sprint(facts.Deps), fmt.Sprint([]Dep{{"github.com/sirupsen/logrus", "v1.9.3", "gomod"}, {"github.com/spf13/cobra", "v1.9.1", "gomod"}, {"github.com/tailscale/hujson", "v0.0.0-20260718110524-10d7940d4c87", "gomod"}, {"jest", "29.0.0", "npm"}, {"lodash", "4.17.21", "npm"}}); got != want {
+		t.Fatalf("deps:\ngot  %s\nwant %s", got, want)
+	}
+	if got, want := fmt.Sprint(facts.Scripts), fmt.Sprint([]Script{{"build", "tsc"}, {"test", "jest --ci"}}); got != want {
+		t.Fatalf("scripts:\ngot  %s\nwant %s", got, want)
+	}
+	if got, want := fmt.Sprint(facts.Workspaces), fmt.Sprint([]string{"libs/a", "packages/*"}); got != want {
+		t.Fatalf("workspaces:\ngot  %s\nwant %s", got, want)
+	}
+	if got, want := fmt.Sprint(facts.Files), fmt.Sprint(Files{Total: 7, ByExtension: map[string]int{"go": 1, "json": 1, "md": 1, "mod": 1, "png": 1, "yml": 1}}); got != want {
+		t.Fatalf("files:\ngot  %s\nwant %s", got, want)
+	}
+	if got, want := fmt.Sprint(facts.CI), fmt.Sprint(CI{Present: true, Files: []string{".github/workflows/ci.yml"}}); got != want {
+		t.Fatalf("ci:\ngot  %s\nwant %s", got, want)
+	}
+	if got := facts.Summary(); !strings.Contains(got, "Files: 7") || !strings.Contains(got, "CI: present (.github/workflows/ci.yml)") {
+		t.Fatalf("summary mismatch:\n%s", got)
+	}
+}
+
+func TestInspectEdgeCases(t *testing.T) {
+	root := fixtureRepo(t)
+	facts, err := Inspect(root, root)
+	if err != nil || facts.Invocation != "" {
+		t.Fatalf("invocation must be omitted when equal to root: %q, %v", facts.Invocation, err)
+	}
+	empty := t.TempDir()
+	write(t, empty, "hello.txt", "hi")
+	write(t, empty, ".git/objects/aa/aaaa", "binary")
+	if err := os.Symlink("hello.txt", filepath.Join(empty, "link.txt")); err != nil {
+		t.Fatal(err)
+	}
+	facts, err = Inspect(empty, "")
+	if err != nil || facts.Files.Total != 1 || facts.Files.ByExtension["txt"] != 1 || len(facts.Deps) != 0 || facts.CI.Present {
+		t.Fatalf("unexpected edge facts (git/symlink must be excluded): %+v, %v", facts, err)
+	}
+	bad := t.TempDir()
+	write(t, bad, "package.json", "{not json")
+	if _, err := Inspect(bad, ""); err == nil {
+		t.Fatal("expected error for malformed package.json")
+	}
+}
+
+func TestInspectDeterministic(t *testing.T) {
+	root := fixtureRepo(t)
+	a, err := Inspect(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := Inspect(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ja, _ := json.Marshal(a)
+	if jb, _ := json.Marshal(b); string(ja) != string(jb) || !strings.Contains(string(ja), `"schema_version":"agent-ready.inspect/v1"`) {
+		t.Fatalf("non-deterministic or missing schema_version:\n%s\n%s", ja, jb)
+	}
+}
