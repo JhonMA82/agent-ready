@@ -73,7 +73,7 @@ jobs:
           # Fake opencode in PATH (isolation is HOME/XDG non-mutation; the
           # real pinned version smoke stays in ci.yml).
           FAKE_BIN="$(mktemp -d)"
-          printf '#!/bin/sh\nexit 0\n' > "$FAKE_BIN/opencode"
+          printf '#!/bin/sh\nprintf "%%s\\n" "1.18.15"\n' > "$FAKE_BIN/opencode"
           chmod +x "$FAKE_BIN/opencode"
           REPO="$(mktemp -d)/repo"
           mkdir -p "$REPO"
