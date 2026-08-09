@@ -15,8 +15,17 @@ import (
 func TestPlanOwnershipAndIdempotency(t *testing.T) {
 	root := t.TempDir()
 	first, err := Plan(root, "opencode.json")
-	if err != nil || len(first) != 3 {
+	if err != nil {
 		t.Fatalf("first plan = %#v, %v", first, err)
+	}
+	var manifestSeen bool
+	for _, file := range first {
+		if file.Path == ".agent-ready/manifest.json" {
+			manifestSeen = true
+		}
+	}
+	if !manifestSeen {
+		t.Fatal("ownership manifest missing from plan")
 	}
 	for _, file := range first {
 		full := filepath.Join(root, filepath.FromSlash(file.Path))
@@ -30,6 +39,9 @@ func TestPlanOwnershipAndIdempotency(t *testing.T) {
 	second, err := Plan(root, "opencode.json")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(first) != len(second) {
+		t.Fatalf("plan size changed between runs: %d vs %d", len(first), len(second))
 	}
 	for i := range first {
 		if first[i].Path != second[i].Path || !bytes.Equal(first[i].After, second[i].After) || !bytes.Equal(second[i].Before, second[i].After) {

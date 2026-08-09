@@ -25,7 +25,18 @@ func TestCommitOrdersManifestLastAndPreservesDesiredModes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{".agent-ready/skills/agent-ready-orchestrator/SKILL.md", ".opencode/commands/agent-ready.md", "opencode.json", ".agent-ready/manifest.json"}
+	// Expected order is the plan's sorted changes with the ownership manifest
+	// committed last. Derive it from the plan instead of pinning the asset
+	// list: embedded assets grow with each content PR (skills, references,
+	// examples), while the ordering contract under test stays "deterministic,
+	// manifest last".
+	want := make([]string, 0, len(p.Changes()))
+	for _, c := range p.Changes() {
+		if c.Path() != ".agent-ready/manifest.json" {
+			want = append(want, c.Path())
+		}
+	}
+	want = append(want, ".agent-ready/manifest.json")
 	if !reflect.DeepEqual(order, want) {
 		t.Fatalf("order=%v", order)
 	}
