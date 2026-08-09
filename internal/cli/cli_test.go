@@ -80,6 +80,37 @@ func TestHelperContracts(t *testing.T) {
 	}
 }
 
+func TestNestedHelperContracts(t *testing.T) {
+	save := Helper{Name: "save", Run: func(_ context.Context, options Options) (any, error) {
+		if options.Stage == "" {
+			return nil, errors.New("--stage is required")
+		}
+		return summaryFacts{Total: 1}, nil
+	}}
+	status := Helper{Name: "status", Run: func(context.Context, Options) (any, error) { return summaryFacts{Total: 0}, nil }}
+	ckpt := Helper{Name: "checkpoint", Subs: []Helper{save, status}}
+	for _, tt := range []struct {
+		args []string
+		want string
+	}{{[]string{"checkpoint", "save", "--stage", "plan"}, "files: 1\n"}, {[]string{"checkpoint", "save", "--json", "--stage", "plan"}, `"Total":1`}, {[]string{"checkpoint", "status"}, "files: 0\n"}} {
+		var out bytes.Buffer
+		cmd := NewRoot(nil, ckpt)
+		cmd.SetArgs(tt.args)
+		cmd.SetOut(&out)
+		if err := cmd.Execute(); err != nil || !strings.Contains(out.String(), tt.want) {
+			t.Fatalf("output %q, error %v", out.String(), err)
+		}
+	}
+	var errOut bytes.Buffer
+	cmd := NewRoot(nil, ckpt)
+	cmd.SetArgs([]string{"checkpoint", "save"})
+	cmd.SetErr(&errOut)
+	err := cmd.Execute()
+	if exit, ok := err.(ExitError); !ok || exit.Code != 1 || !strings.Contains(errOut.String(), "--stage is required") {
+		t.Fatalf("expected ExitError{1} with reason on stderr, got %v / %q", err, errOut.String())
+	}
+}
+
 func TestValidateHelperContracts(t *testing.T) {
 	var out, errOut bytes.Buffer
 	cmd := NewRoot(nil, Helper{Name: "validate", Run: func(context.Context, Options) (any, error) {

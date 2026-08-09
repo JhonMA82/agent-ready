@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/JhonMA82/agent-ready/internal/app"
+	"github.com/JhonMA82/agent-ready/internal/checkpoint"
 	"github.com/JhonMA82/agent-ready/internal/cli"
 	"github.com/JhonMA82/agent-ready/internal/inventory"
 	"github.com/JhonMA82/agent-ready/internal/plan"
@@ -42,7 +43,31 @@ func main() {
 			return facts, nil
 		},
 	}
-	if err := cli.NewRoot(run, inspect, validate).Execute(); err != nil {
+	// withRoot discovers the containing repository and hands its root to f.
+	withRoot := func(f func(string) (any, error)) func(context.Context, cli.Options) (any, error) {
+		return func(ctx context.Context, _ cli.Options) (any, error) {
+			selection, err := repository.Discover(ctx, "", "git")
+			if err != nil {
+				return nil, err
+			}
+			return f(selection.Root)
+		}
+	}
+	ckpt := cli.Helper{Name: "checkpoint", Subs: []cli.Helper{
+		{Name: "save", Run: func(ctx context.Context, options cli.Options) (any, error) {
+			if options.Stage == "" {
+				return nil, errors.New("--stage is required (e.g. --stage exploration_plan)")
+			}
+			selection, err := repository.Discover(ctx, "", "git")
+			if err != nil {
+				return nil, err
+			}
+			return checkpoint.Save(selection.Root, options.Stage, options.Complete)
+		}},
+		{Name: "status", Run: withRoot(func(root string) (any, error) { return checkpoint.Status(root) })},
+	}}
+	changes := cli.Helper{Name: "changes", Run: withRoot(func(root string) (any, error) { return checkpoint.Changes(root) })}
+	if err := cli.NewRoot(run, inspect, validate, ckpt, changes).Execute(); err != nil {
 		if exit, ok := err.(cli.ExitError); ok {
 			os.Exit(exit.Code)
 		}

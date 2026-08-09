@@ -56,6 +56,13 @@ var manifests = []struct {
 
 var ciRoot = []string{".gitlab-ci.yml", ".circleci/config.yml", "azure-pipelines.yml", "Jenkinsfile"}
 
+// Paths returns the sorted relative paths of regular files under root,
+// excluding .git and symlinks (the same walk Inspect reports).
+func Paths(root string) ([]string, error) {
+	paths, _, err := collectFiles(root)
+	return paths, err
+}
+
 // Inspect collects deterministic facts for root; invocation is reported only
 // when it differs from root.
 func Inspect(root, invocation string) (Facts, error) {

@@ -11,18 +11,22 @@ import (
 )
 
 type Options struct {
-	DryRun bool
-	JSON   bool
-	Target string // validate --target (empty: discover from cwd)
+	DryRun   bool
+	JSON     bool
+	Target   string // validate --target (empty: discover from cwd)
+	Stage    string // checkpoint save --stage
+	Complete bool   // checkpoint save --complete
 }
 type Runner func(context.Context, Options) plan.Result
 
 // Helper is a deterministic JSON-fact subcommand (spec R8): Run returns facts
 // rendered as JSON with --json or as the value's compact Summary; helpers exit
-// 0 on success, 1 on failure, and never perform semantic routing.
+// 0 on success, 1 on failure, and never perform semantic routing. Subs nests
+// subcommands under the helper name (e.g. checkpoint save/status).
 type Helper struct {
 	Name string
 	Run  func(context.Context, Options) (any, error)
+	Subs []Helper
 }
 
 type ExitError struct{ Code int }
@@ -30,7 +34,8 @@ type ExitError struct{ Code int }
 func (e ExitError) Error() string { return fmt.Sprintf("exit status %d", e.Code) }
 
 // NewRoot builds the root command: init (unchanged) plus one subcommand per
-// Helper with the helper exit-code contract (0 success / 1 failure).
+// Helper with the helper exit-code contract (0 success / 1 failure); helpers
+// with Subs become parent commands (e.g. checkpoint save/status).
 func NewRoot(run Runner, helpers ...Helper) *cobra.Command {
 	root := &cobra.Command{Use: "agent-ready", Short: "Prepare a repository for agent-ready workflows", SilenceErrors: true, SilenceUsage: true}
 	var options Options
@@ -48,6 +53,10 @@ func NewRoot(run Runner, helpers ...Helper) *cobra.Command {
 	init.Flags().BoolVar(&options.JSON, "json", false, "render one JSON result")
 	root.AddCommand(init)
 	for _, helper := range helpers {
+		if len(helper.Subs) > 0 {
+			root.AddCommand(parentFor(helper, &options))
+			continue
+		}
 		sub := &cobra.Command{Use: helper.Name, Short: "Emit deterministic " + helper.Name + " facts", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 			value, err := helper.Run(cmd.Context(), options)
 			// Render a non-nil result even when Run failed so a failing
@@ -70,6 +79,35 @@ func NewRoot(run Runner, helpers ...Helper) *cobra.Command {
 		root.AddCommand(sub)
 	}
 	return root
+}
+
+// parentFor builds a parent command from helper.Subs (e.g. checkpoint
+// save/status). It stays runnable so unknown subcommands fail Args validation
+// (exit 2) instead of silently showing help.
+func parentFor(helper Helper, options *Options) *cobra.Command {
+	sub := &cobra.Command{Use: helper.Name, Short: "Emit deterministic " + helper.Name + " facts", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() }}
+	for _, nested := range helper.Subs {
+		child := &cobra.Command{Use: nested.Name, Short: "Emit deterministic " + nested.Name + " facts", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+			value, err := nested.Run(cmd.Context(), *options)
+			if value != nil {
+				if rerr := RenderHelper(cmd.OutOrStdout(), value, options.JSON); rerr != nil && err == nil {
+					err = rerr
+				}
+			}
+			if err != nil {
+				fmt.Fprintln(cmd.ErrOrStderr(), err)
+				return ExitError{Code: 1}
+			}
+			return nil
+		}}
+		child.Flags().BoolVar(&options.JSON, "json", false, "emit JSON facts")
+		if nested.Name == "save" {
+			child.Flags().StringVar(&options.Stage, "stage", "", "checkpoint stage (e.g. exploration_plan)")
+			child.Flags().BoolVar(&options.Complete, "complete", false, "mark the checkpoint complete")
+		}
+		sub.AddCommand(child)
+	}
+	return sub
 }
 
 // summarizer is implemented by helper facts with a compact rendering (D5).
