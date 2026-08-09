@@ -50,11 +50,14 @@ func TestDoctorTiers(t *testing.T) {
 func TestDoctorHealthyWithWarnings(t *testing.T) {
 	root := t.TempDir()
 	fakeGit(t, root)
+	// CI has no opencode on PATH; inject a fake so the required tier passes.
+	bin := fakeBin(t, "opencode", "1.18.15")
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	facts, err := Doctor(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Real system usually has git; project state may warn without init.
+	// git/opencode present; project state may warn without init.
 	if !facts.Healthy {
 		t.Fatalf("doctor unhealthy: %+v", facts.Checks)
 	}
