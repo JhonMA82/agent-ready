@@ -63,10 +63,11 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           PREFIX="$(mktemp -d)/prefix"
           WORK="$(mktemp -d)"
-          VERSION="${TAG#v}" PREFIX="$PREFIX" \
-            ASSET_URL="https://github.com/JhonMA82/agent-ready/releases/download/${TAG}" \
-            GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
-            ./scripts/install.sh
+          VERSION="${TAG#v}"
+          export VERSION PREFIX ASSET_URL GITHUB_TOKEN
+          ASSET_URL="https://github.com/JhonMA82/agent-ready/releases/download/${TAG}"
+          GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          ./scripts/install.sh
           test -x "$PREFIX/bin/agent-ready"
           "$PREFIX/bin/agent-ready" --version | grep -q "agent-ready ${VERSION}"
           # Fake opencode in PATH (isolation is HOME/XDG non-mutation; the
