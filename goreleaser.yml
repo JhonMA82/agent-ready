@@ -1,0 +1,57 @@
+# Agent-Ready release configuration (spec §3.1/§29).
+version: 2
+
+project_name: agent-ready
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: agent-ready
+    main: ./cmd/agent-ready
+    binary: agent-ready
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X github.com/JhonMA82/agent-ready/internal/version.Version={{.Version}}
+      - -X github.com/JhonMA82/agent-ready/internal/version.Commit={{.Commit}}
+      - -X github.com/JhonMA82/agent-ready/internal/version.Date={{.Date}}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+release:
+  github:
+    owner: JhonMA82
+    name: agent-ready
+  draft: false
+  prerelease: auto
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"

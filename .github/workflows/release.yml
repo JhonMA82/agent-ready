@@ -1,0 +1,92 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+      - name: Build and test
+        run: |
+          go build ./...
+          go vet ./...
+          go test ./... -count=1
+      - name: Build matrix subset
+        run: |
+          set -e
+          for target in "linux amd64" "linux arm64" "darwin amd64" "darwin arm64" "windows amd64"; do
+            set -- $target
+            GOOS=$1 GOARCH=$2 CGO_ENABLED=0 go build -o /tmp/agent-ready-$1-$2 ./cmd/agent-ready
+          done
+
+  release:
+    needs: build-check
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  verify-install:
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify release artifact install and isolation
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          PREFIX="$(mktemp -d)/prefix"
+          WORK="$(mktemp -d)"
+          VERSION="${TAG#v}" PREFIX="$PREFIX" \
+            ASSET_URL="https://github.com/JhonMA82/agent-ready/releases/download/${TAG}" \
+            ./scripts/install.sh
+          test -x "$PREFIX/bin/agent-ready"
+          "$PREFIX/bin/agent-ready" --version | grep -q "agent-ready ${VERSION}"
+          # Fake opencode in PATH (isolation is HOME/XDG non-mutation; the
+          # real pinned version smoke stays in ci.yml).
+          FAKE_BIN="$(mktemp -d)"
+          printf '#!/bin/sh\nexit 0\n' > "$FAKE_BIN/opencode"
+          chmod +x "$FAKE_BIN/opencode"
+          REPO="$(mktemp -d)/repo"
+          git -C "$REPO" init -q
+          printf 'module x\n' > "$REPO/go.mod"
+          export HOME="$(mktemp -d)" XDG_CONFIG_HOME="$(mktemp -d)" \
+                 XDG_CACHE_HOME="$(mktemp -d)" XDG_DATA_HOME="$(mktemp -d)" \
+                 XDG_STATE_HOME="$(mktemp -d)" PATH="$FAKE_BIN:$PATH"
+          snapshot() {
+            find "$HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" \
+              -mindepth 1 \( -type f -exec sha256sum {} + -o -type d -print \) 2>/dev/null \
+              | sort | sha256sum
+          }
+          BEFORE="$(snapshot)"
+          (cd "$REPO" && "$PREFIX/bin/agent-ready" init >/dev/null)
+          AFTER="$(snapshot)"
+          test "$BEFORE" = "$AFTER" || { echo "GLOBAL POLLUTION DETECTED"; exit 1; }
+          test -f "$REPO/.agent-ready/manifest.json" || { echo "REPO NOT INITIALIZED"; exit 1; }
+          echo "verify-install: A/Q PASS"
