@@ -1,0 +1,7 @@
+{
+  // Keep this first.
+  "theme": "dark",
+  "skills": {
+    "paths": ["./existing","./.agent-ready/skills",],
+  },
+}
