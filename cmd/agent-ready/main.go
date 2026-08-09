@@ -11,6 +11,7 @@ import (
 	"github.com/JhonMA82/agent-ready/internal/inventory"
 	"github.com/JhonMA82/agent-ready/internal/plan"
 	"github.com/JhonMA82/agent-ready/internal/repository"
+	statestore "github.com/JhonMA82/agent-ready/internal/state"
 	"github.com/JhonMA82/agent-ready/internal/validation"
 )
 
@@ -67,7 +68,8 @@ func main() {
 		{Name: "status", Run: withRoot(func(root string) (any, error) { return checkpoint.Status(root) })},
 	}}
 	changes := cli.Helper{Name: "changes", Run: withRoot(func(root string) (any, error) { return checkpoint.Changes(root) })}
-	if err := cli.NewRoot(run, inspect, validate, ckpt, changes).Execute(); err != nil {
+	state := cli.Helper{Name: "state", Run: withRoot(func(root string) (any, error) { return statestore.Read(root) })}
+	if err := cli.NewRoot(run, inspect, validate, ckpt, changes, state).Execute(); err != nil {
 		if exit, ok := err.(cli.ExitError); ok {
 			os.Exit(exit.Code)
 		}

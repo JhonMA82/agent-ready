@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -163,17 +164,36 @@ func initWithOptions(ctx context.Context, dryRun bool, options safeio.Options) p
 		return refusedAt(selection.Root, selection.Invocation, "plan", dryRun, err)
 	}
 	r := Result(p, selection.Invocation, dryRun)
-	if dryRun || r.Outcome == plan.Noop {
+	if dryRun {
 		return r
 	}
-	result, err := safeio.Commit(p, options)
-	if err == nil {
-		return r
+	if r.Outcome != plan.Noop {
+		result, err := safeio.Commit(p, options)
+		if err == nil {
+			// committed; ensure the harness-owned directories below
+		} else if result.RecoveryPath != "" {
+			return commitFailed(r, plan.RecoveryRequired, "recovery", err)
+		} else {
+			return commitFailed(r, plan.CommitFailed, "commit", err)
+		}
 	}
-	if result.RecoveryPath != "" {
-		return commitFailed(r, plan.RecoveryRequired, "recovery", err)
+	if err := ensureHarnessDirs(selection.Root); err != nil {
+		return commitFailed(r, plan.CommitFailed, "state_dirs", err)
 	}
-	return commitFailed(r, plan.CommitFailed, "commit", err)
+	return r
+}
+
+// ensureHarnessDirs creates the non-manifest-owned runtime directories
+// (.agent-ready/state, checkpoints, checkpoints/history) after a successful
+// non-dry-run init (spec R10). They are never part of the ownership manifest,
+// so model-written state files cannot refuse a later init rerun.
+func ensureHarnessDirs(root string) error {
+	for _, dir := range []string{".agent-ready/state", ".agent-ready/checkpoints", ".agent-ready/checkpoints/history"} {
+		if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(dir)), 0o755); err != nil {
+			return fmt.Errorf("create %s: %w", dir, err)
+		}
+	}
+	return nil
 }
 
 func refusedAt(root, invocation, category string, dryRun bool, err error) plan.Result {

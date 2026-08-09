@@ -232,3 +232,51 @@ func snapshot(t *testing.T, root string) map[string]string {
 	}
 	return out
 }
+
+// TestInitRerunAfterModelWrites proves spec R10: init creates the
+// non-manifest-owned runtime directories and a rerun stays noop even after
+// the model writes semantic state files into them.
+func TestInitRerunAfterModelWrites(t *testing.T) {
+	if testing.Short() {
+		t.Skip("process test builds and executes the command")
+	}
+	base := t.TempDir()
+	binDir, binary := filepath.Join(base, "bin"), filepath.Join(base, "agent-ready")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fake := filepath.Join(binDir, "opencode")
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\nprintf '%s\\n' '"+opencode.RequiredVersion()+"'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	build := exec.Command("go", "build", "-o", binary, "./cmd/agent-ready")
+	build.Dir = filepath.Clean(filepath.Join("..", ".."))
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build: %v: %s", err, out)
+	}
+	env := append(os.Environ(), "HOME="+filepath.Join(base, "home"), "XDG_CONFIG_HOME="+filepath.Join(base, "xdg"), "PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	repo := newRepo(t, base, "modelwrites")
+	first := runJSON(t, binary, repo, env, 0, "init", "--json")
+	if first.Outcome != plan.Changed {
+		t.Fatalf("first init=%+v", first)
+	}
+	for _, dir := range []string{".agent-ready/state", ".agent-ready/checkpoints", ".agent-ready/checkpoints/history"} {
+		if info, err := os.Stat(filepath.Join(repo, filepath.FromSlash(dir))); err != nil || !info.IsDir() {
+			t.Fatalf("missing harness dir %s: %v", dir, err)
+		}
+	}
+	// The model writes semantic state; the rerun must stay noop, not refuse.
+	decisions := filepath.Join(repo, ".agent-ready/state/decisions.jsonl")
+	if err := os.WriteFile(decisions, []byte("{\"action\":\"noop\",\"reason\":\"sample\"}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	second := runJSON(t, binary, repo, env, 0, "init", "--json")
+	if second.Outcome != plan.Noop || second.NextStep != "/agent-ready" {
+		t.Fatalf("rerun after model writes=%+v", second)
+	}
+	stateOut, code := runCommand(t, binary, repo, env, "state", "--json")
+	if code != 0 || !strings.Contains(stateOut, `"schema_version":"agent-ready.state/v1"`) || !strings.Contains(stateOut, `"exists":true`) {
+		t.Fatalf("state facts code=%d: %s", code, stateOut)
+	}
+}
