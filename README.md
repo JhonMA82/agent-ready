@@ -9,9 +9,7 @@ Agent-Ready is a lightweight Go CLI plus an OpenCode-native harness. It bootstra
 ## Quick path
 
 ```sh
-# 1. Install the binary (Linux/macOS) — see INSTALL.md for details
-#    Option A: run the repository's installer:  scripts/install.sh
-#    Option B: manual — download the release asset, verify checksums.txt, add to PATH
+# 1. Install the binary — see the Installation section below
 agent-ready --version
 
 # 2. Bootstrap the repository locally
@@ -22,6 +20,60 @@ agent-ready init
 ```
 
 Expected result: `agent-ready init` creates `.agent-ready/` and registers the `/agent-ready` command locally, touching nothing global. The audit proposes only evidence-backed artifacts (and `NO_ACTION` is a first-class outcome).
+
+## Installation
+
+**Requirements:** Git · OpenCode 1.18.15 (pinned) · Linux, macOS, or Windows (WSL for the script).
+
+### Option A — installer script (Linux/macOS, recommended)
+
+The installer lives in this repository at `scripts/install.sh`. It downloads the release asset for your platform, verifies the sha256 checksum (fails closed on mismatch), and installs to `$PREFIX/bin` (default `~/.local/bin`). It never requires sudo.
+
+```sh
+# From a checkout of this repository:
+VERSION=latest PREFIX=$HOME/.local ./scripts/install.sh
+
+# Or pin an exact release:
+VERSION=v0.1.0 PREFIX=$HOME/.local ./scripts/install.sh
+
+# For a system-wide install, choose your own privilege mechanism:
+sudo env VERSION=latest PREFIX=/usr/local ./scripts/install.sh
+```
+
+After installing, add the prefix to your PATH if it isn't there:
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"   # add to your shell profile
+```
+
+### Option B — manual install from a release
+
+1. Open the [releases page](https://github.com/JhonMA82/agent-ready/releases) and download the asset for your platform, e.g. `agent-ready_0.1.0_linux_amd64.tar.gz` (or `.zip` on Windows), plus `checksums.txt`.
+2. Verify the checksum before installing:
+
+   ```sh
+   sha256sum -c checksums.txt     # macOS: shasum -a 256 -c checksums.txt
+   ```
+
+3. Extract and install:
+
+   ```sh
+   tar -xzf agent-ready_0.1.0_linux_amd64.tar.gz
+   install -m 0755 agent-ready "$HOME/.local/bin/agent-ready"
+   export PATH="$HOME/.local/bin:$PATH"
+   ```
+
+### Windows
+
+Download the `.zip` asset, extract it, and add the folder to `PATH`. There is no Windows installer in V1.
+
+### Verify the installation
+
+```sh
+agent-ready --version   # e.g. agent-ready 0.1.0 (commit)
+```
+
+Full details, uninstall, and update semantics: [INSTALL.md](INSTALL.md).
 
 ## What it does
 
