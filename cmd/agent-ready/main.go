@@ -9,6 +9,7 @@ import (
 	"github.com/JhonMA82/agent-ready/internal/checkpoint"
 	"github.com/JhonMA82/agent-ready/internal/cli"
 	"github.com/JhonMA82/agent-ready/internal/inventory"
+	"github.com/JhonMA82/agent-ready/internal/lifecycle"
 	"github.com/JhonMA82/agent-ready/internal/plan"
 	"github.com/JhonMA82/agent-ready/internal/repository"
 	statestore "github.com/JhonMA82/agent-ready/internal/state"
@@ -100,7 +101,22 @@ func main() {
 		return tools.Install(plan)
 	}}
 	toolsCmd := cli.Helper{Name: "tools", Subs: []cli.Helper{toolsStatus, toolsDoctor, toolsRecommend, toolsInstall}}
-	if err := cli.NewRoot(run, inspect, validate, ckpt, changes, state, toolsCmd).Execute(); err != nil {
+	status := cli.Helper{Name: "status", Run: withRoot(func(root string) (any, error) { return lifecycle.Status(root) })}
+	doctor := cli.Helper{Name: "doctor", Run: func(ctx context.Context, _ cli.Options) (any, error) {
+		selection, err := repository.Discover(ctx, "", "git")
+		if err != nil {
+			return nil, err
+		}
+		facts, err := lifecycle.Doctor(ctx, selection.Root)
+		if err != nil {
+			return nil, err
+		}
+		if !facts.Healthy {
+			return facts, errors.New("required checks failed")
+		}
+		return facts, nil
+	}}
+	if err := cli.NewRoot(run, inspect, validate, ckpt, changes, state, toolsCmd, status, doctor).Execute(); err != nil {
 		if exit, ok := err.(cli.ExitError); ok {
 			os.Exit(exit.Code)
 		}
