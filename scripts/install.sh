@@ -60,14 +60,39 @@ if [ "$VERSION" = "latest" ]; then
   ASSET="agent-ready_${TAG#v}_${OS}_${ARCH}.tar.gz"
 else
   BASE="${ASSET_URL:-https://github.com/$REPO/releases/download/$VERSION}"
-  ASSET="agent-ready_${VERSION}_${OS}_${ARCH}.tar.gz"
+  ASSET="agent-ready_${VERSION#v}_${OS}_${ARCH}.tar.gz"
 fi
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# download_asset tries the web URL, then falls back to the authenticated API
+# asset endpoint (private-repo quirk: web download URLs can 404 while the API
+# serves the file). Requires a token only for the fallback path.
+download_asset() {
+  name="$1"; out="$2"
+  if fetch -o "$out" "$BASE/$name"; then
+    return 0
+  fi
+  TOKEN="${GITHUB_TOKEN:-$GH_TOKEN}"
+  if [ -z "$TOKEN" ]; then
+    echo "Download of $name failed and no token is available for the API fallback." >&2
+    return 1
+  fi
+  TAG="$(basename "$BASE")"
+  ASSET_ID="$(fetch -sSL "https://api.github.com/repos/$REPO/releases/tags/$TAG" \
+    | grep -B2 "\"name\": \"$name\"" | grep '"id"' | head -n1 | sed 's/.*"id": *\([0-9]*\).*/\1/')"
+  if [ -z "$ASSET_ID" ]; then
+    echo "Could not resolve asset $name in release $TAG." >&2
+    return 1
+  fi
+  echo "Using API fallback for $name (asset id $ASSET_ID)"
+  fetch -H "Accept: application/octet-stream" -o "$out" \
+    "https://api.github.com/repos/$REPO/releases/assets/$ASSET_ID"
+}
+
 echo "Downloading $BASE/$ASSET"
-fetch -o "$TMP/$ASSET" "$BASE/$ASSET"
-fetch -o "$TMP/checksums.txt" "$BASE/checksums.txt"
+download_asset "$ASSET" "$TMP/$ASSET"
+download_asset "checksums.txt" "$TMP/checksums.txt"
 
 # Fail closed on checksum mismatch: nothing is installed. The checksums.txt
 # line may carry a relative or absolute asset path; compare hashes directly.
