@@ -76,6 +76,7 @@ jobs:
           printf '#!/bin/sh\nexit 0\n' > "$FAKE_BIN/opencode"
           chmod +x "$FAKE_BIN/opencode"
           REPO="$(mktemp -d)/repo"
+          mkdir -p "$REPO"
           git -C "$REPO" init -q
           printf 'module x\n' > "$REPO/go.mod"
           export HOME="$(mktemp -d)" XDG_CONFIG_HOME="$(mktemp -d)" \
