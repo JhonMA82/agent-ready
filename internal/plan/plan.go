@@ -28,6 +28,7 @@ type Result struct {
 	SchemaVersion string   `json:"schema_version"`
 	Outcome       Outcome  `json:"outcome"`
 	Root          string   `json:"root"`
+	Invocation    string   `json:"invocation,omitempty"`
 	DryRun        bool     `json:"dry_run"`
 	Actions       []Action `json:"actions"`
 	Refusal       *Refusal `json:"refusal,omitempty"`

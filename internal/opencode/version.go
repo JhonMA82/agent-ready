@@ -5,7 +5,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -27,7 +29,22 @@ func Preflight(ctx context.Context, config []byte) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("OpenCode %s is required on PATH", RequiredVersion())
 	}
-	out, err := exec.CommandContext(ctx, binary, "--version").Output()
+	// Isolate the real probe so a successful preflight never mutates the
+	// caller's HOME/XDG trees (real OpenCode 1.18.15 creates cache/config/data/state).
+	probe, err := os.MkdirTemp("", "agent-ready-opencode-probe-")
+	if err != nil {
+		return "", fmt.Errorf("isolate OpenCode probe: %w", err)
+	}
+	defer os.RemoveAll(probe)
+	cmd := exec.CommandContext(ctx, binary, "--version")
+	cmd.Env = append(os.Environ(),
+		"HOME="+probe,
+		"XDG_CONFIG_HOME="+filepath.Join(probe, "config"),
+		"XDG_CACHE_HOME="+filepath.Join(probe, "cache"),
+		"XDG_DATA_HOME="+filepath.Join(probe, "data"),
+		"XDG_STATE_HOME="+filepath.Join(probe, "state"),
+	)
+	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("read OpenCode version: %w", err)
 	}

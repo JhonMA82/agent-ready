@@ -1,4 +1,4 @@
-module github.com/gentle-ai/agent-ready
+module github.com/JhonMA82/agent-ready
 
 go 1.24
 

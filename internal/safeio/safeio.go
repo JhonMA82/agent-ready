@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/gentle-ai/agent-ready/internal/app"
+	"github.com/JhonMA82/agent-ready/internal/repository"
 )
 
 const journalName = ".agent-ready/transaction.json"
@@ -20,6 +20,19 @@ type Hook func(phase, path string) error
 type Options struct{ Hook Hook }
 
 type Result struct{ RecoveryPath string }
+
+type Change interface {
+	Path() string
+	Kind() string
+	Before() []byte
+	After() []byte
+	Mode() fs.FileMode
+}
+
+type Plan[C Change] interface {
+	Root() string
+	Changes() []C
+}
 
 type Error struct {
 	Phase, Path, RecoveryPath string
@@ -46,7 +59,7 @@ type journal struct {
 	Entries []entry `json:"entries"`
 }
 
-func Commit(p app.Plan, opts Options) (Result, error) {
+func Commit[C Change](p Plan[C], opts Options) (Result, error) {
 	changes := ordered(p.Changes())
 	for _, c := range changes {
 		if c.Kind() != "noop" {
@@ -56,7 +69,7 @@ func Commit(p app.Plan, opts Options) (Result, error) {
 		}
 	}
 	j := journal{Schema: "agent-ready.transaction/v1"}
-	active := make([]app.Change, 0, len(changes))
+	active := make([]C, 0, len(changes))
 	for _, c := range changes {
 		if c.Kind() == "noop" {
 			continue
@@ -105,6 +118,17 @@ func Recover(root string, opts Options) (Result, error) {
 		}
 		return Result{}, &Error{Phase: "recovery", Path: journalName, Cause: err, RecoveryPath: path}
 	}
+	seen := make(map[string]bool, len(j.Entries))
+	for _, entry := range j.Entries {
+		canonical := filepath.ToSlash(filepath.Clean(filepath.FromSlash(entry.Path)))
+		if entry.Path == "" || canonical != entry.Path || entry.Path == journalName || seen[entry.Path] {
+			return Result{}, &Error{Phase: "recovery", Path: journalName, Cause: errors.New("invalid recovery journal path"), RecoveryPath: path}
+		}
+		if _, err := repository.Contained(root, filepath.FromSlash(entry.Path)); err != nil {
+			return Result{}, &Error{Phase: "recovery", Path: journalName, Cause: err, RecoveryPath: path}
+		}
+		seen[entry.Path] = true
+	}
 	if err := rollback(root, j, opts); err != nil {
 		return Result{}, &Error{Phase: "recovery", Path: journalName, Cause: err, RecoveryPath: path}
 	}
@@ -114,7 +138,7 @@ func Recover(root string, opts Options) (Result, error) {
 	return Result{}, nil
 }
 
-func ordered(changes []app.Change) []app.Change {
+func ordered[C Change](changes []C) []C {
 	sort.Slice(changes, func(i, k int) bool {
 		im, km := changes[i].Path() == ".agent-ready/manifest.json", changes[k].Path() == ".agent-ready/manifest.json"
 		return im != km && !im || im == km && changes[i].Path() < changes[k].Path()
@@ -122,7 +146,7 @@ func ordered(changes []app.Change) []app.Change {
 	return changes
 }
 
-func validate(root string, c app.Change) error {
+func validate(root string, c Change) error {
 	path := filepath.Join(root, filepath.FromSlash(c.Path()))
 	info, err := os.Lstat(path)
 	if c.Before() == nil {

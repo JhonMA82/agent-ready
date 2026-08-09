@@ -3,7 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
-	"github.com/gentle-ai/agent-ready/internal/plan"
+	"github.com/JhonMA82/agent-ready/internal/plan"
 	"strings"
 	"testing"
 )
@@ -25,5 +25,27 @@ func TestInitContracts(t *testing.T) {
 	cmd.SetArgs([]string{"init", "extra"})
 	if err := cmd.Execute(); err == nil {
 		t.Fatal("expected usage error")
+	}
+}
+
+func TestRenderContract(t *testing.T) {
+	refused := plan.Result{Outcome: plan.Refused, Root: "/repo", Invocation: "/repo/a/b", Refusal: &plan.Refusal{Category: "repository", Message: "not a worktree", Remediation: "retry inside a repository"}}
+	var out bytes.Buffer
+	if err := Render(&out, refused, false); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Root: /repo", "Invocation: /repo/a/b", "Refused (repository): not a worktree", "Remediation: retry inside a repository"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("missing %q in %q", want, out.String())
+		}
+	}
+	out.Reset()
+	nested := plan.NewResult("/repo", plan.DryRun, true, nil)
+	nested.Invocation = "/repo/a"
+	if err := Render(&out, nested, true); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"invocation":"/repo/a"`) {
+		t.Fatalf("nested invocation missing: %s", out.String())
 	}
 }

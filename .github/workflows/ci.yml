@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./...
+      - run: go vet ./...
+
+  opencode-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install the exact supported OpenCode release
+        run: npm install --global opencode-ai@1.18.15
+      - name: Prove repository-local config compatibility
+        run: |
+          test "$(opencode --version)" = "1.18.15"
+          go build -o "$RUNNER_TEMP/agent-ready" ./cmd/agent-ready
+          repo="$RUNNER_TEMP/smoke-repository"
+          mkdir "$repo"
+          git -C "$repo" init --quiet
+          export HOME="$RUNNER_TEMP/home"
+          export XDG_CONFIG_HOME="$RUNNER_TEMP/xdg"
+          mkdir "$HOME" "$XDG_CONFIG_HOME"
+          (cd "$repo" && "$RUNNER_TEMP/agent-ready" init --json)
+          (cd "$repo" && opencode debug config > "$RUNNER_TEMP/config.json")
+          node -e 'const c=JSON.parse(require("fs").readFileSync(process.argv[1])); if (!c.skills?.paths?.includes("./.agent-ready/skills")) process.exit(1)' "$RUNNER_TEMP/config.json"
+          ! grep -Eq '^(model|agent|subtask):' "$repo/.opencode/commands/agent-ready.md"

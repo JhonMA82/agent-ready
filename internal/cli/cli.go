@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/gentle-ai/agent-ready/internal/plan"
+	"github.com/JhonMA82/agent-ready/internal/plan"
 	"github.com/spf13/cobra"
 )
 
@@ -42,12 +42,16 @@ func Render(w io.Writer, r plan.Result, jsonMode bool) error {
 	if jsonMode {
 		return json.NewEncoder(w).Encode(r)
 	}
-	fmt.Fprintf(w, "Outcome: %s\nRoot: %s\nDry run: %t\n", r.Outcome, r.Root, r.DryRun)
+	fmt.Fprintf(w, "Outcome: %s\nRoot: %s\n", r.Outcome, r.Root)
+	if r.Invocation != "" {
+		fmt.Fprintf(w, "Invocation: %s\n", r.Invocation)
+	}
+	fmt.Fprintf(w, "Dry run: %t\n", r.DryRun)
 	for _, a := range r.Actions {
 		fmt.Fprintf(w, "- %s %s\n", a.Kind, a.Path)
 	}
 	if r.Refusal != nil {
-		fmt.Fprintf(w, "Refused: %s\nRemediation: %s\n", r.Refusal.Message, r.Refusal.Remediation)
+		fmt.Fprintf(w, "Refused (%s): %s\nRemediation: %s\n", r.Refusal.Category, r.Refusal.Message, r.Refusal.Remediation)
 	}
 	if r.NextStep != "" {
 		fmt.Fprintf(w, "Next: %s\n", r.NextStep)

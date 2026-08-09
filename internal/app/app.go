@@ -3,15 +3,17 @@ package app
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 
-	"github.com/gentle-ai/agent-ready/internal/bootstrap"
-	"github.com/gentle-ai/agent-ready/internal/opencode"
-	"github.com/gentle-ai/agent-ready/internal/plan"
-	"github.com/gentle-ai/agent-ready/internal/repository"
+	"github.com/JhonMA82/agent-ready/internal/bootstrap"
+	"github.com/JhonMA82/agent-ready/internal/opencode"
+	"github.com/JhonMA82/agent-ready/internal/plan"
+	"github.com/JhonMA82/agent-ready/internal/repository"
+	"github.com/JhonMA82/agent-ready/internal/safeio"
 )
 
 type Change struct {
@@ -96,7 +98,7 @@ func readConfig(root, name string) (*opencode.ConfigFile, error) {
 	return &opencode.ConfigFile{Data: data, Mode: info.Mode().Perm()}, nil
 }
 
-func Result(p Plan, dryRun bool) plan.Result {
+func Result(p Plan, invocation string, dryRun bool) plan.Result {
 	actions := make([]plan.Action, len(p.changes))
 	allNoop := true
 	for i, change := range p.changes {
@@ -104,37 +106,92 @@ func Result(p Plan, dryRun bool) plan.Result {
 		allNoop = allNoop && change.kind == "noop"
 	}
 	if dryRun {
-		return plan.NewResult(p.root, plan.DryRun, true, actions)
+		r := plan.NewResult(p.root, plan.DryRun, true, actions)
+		setInvocation(&r, p.root, invocation)
+		return r
 	}
 	if allNoop {
-		return plan.NewResult(p.root, plan.Noop, false, actions)
+		r := plan.NewResult(p.root, plan.Noop, false, actions)
+		r.NextStep = "/agent-ready"
+		setInvocation(&r, p.root, invocation)
+		return r
 	}
-	r := plan.NewResult(p.root, plan.Refused, false, actions)
-	r.Refusal = &plan.Refusal{Category: "commit_unavailable", Message: "repository writes are not available yet", Remediation: "use --dry-run or install the complete agent-ready V1 build"}
+	r := plan.NewResult(p.root, plan.Changed, false, actions)
+	r.NextStep = "/agent-ready"
+	setInvocation(&r, p.root, invocation)
 	return r
 }
 
+// setInvocation reports the invocation only when it differs from the target root.
+func setInvocation(r *plan.Result, root, invocation string) {
+	if invocation != "" && invocation != root {
+		r.Invocation = invocation
+	}
+}
+
 func Init(ctx context.Context, dryRun bool) plan.Result {
+	return initWithOptions(ctx, dryRun, safeio.Options{})
+}
+
+func initWithOptions(ctx context.Context, dryRun bool, options safeio.Options) plan.Result {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return refusedAt("", "repository", dryRun, err)
+		return refusedAt("", "", "repository", dryRun, err)
 	}
 	selection, err := repository.Discover(ctx, cwd, "git")
 	if err != nil {
-		return refusedAt("", "repository", dryRun, err)
+		return refusedAt("", "", "repository", dryRun, err)
+	}
+	journal := filepath.Join(selection.Root, ".agent-ready", "transaction.json")
+	if _, err := os.Lstat(journal); err == nil {
+		if dryRun {
+			r := failedAt(selection.Root, selection.Invocation, plan.RecoveryRequired, "recovery", errors.New("recovery journal requires a non-dry-run init"))
+			r.DryRun = true
+			return r
+		}
+		if _, err := safeio.Recover(selection.Root, options); err != nil {
+			return failedAt(selection.Root, selection.Invocation, plan.RecoveryRequired, "recovery", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return failedAt(selection.Root, selection.Invocation, plan.RecoveryRequired, "recovery", err)
 	}
 	if _, err := opencode.Preflight(ctx, []byte("{}")); err != nil {
-		return refusedAt(selection.Root, "opencode", dryRun, err)
+		return refusedAt(selection.Root, selection.Invocation, "opencode", dryRun, err)
 	}
 	p, err := Build(selection.Root)
 	if err != nil {
-		return refusedAt(selection.Root, "plan", dryRun, err)
+		return refusedAt(selection.Root, selection.Invocation, "plan", dryRun, err)
 	}
-	return Result(p, dryRun)
+	r := Result(p, selection.Invocation, dryRun)
+	if dryRun || r.Outcome == plan.Noop {
+		return r
+	}
+	result, err := safeio.Commit(p, options)
+	if err == nil {
+		return r
+	}
+	if result.RecoveryPath != "" {
+		return commitFailed(r, plan.RecoveryRequired, "recovery", err)
+	}
+	return commitFailed(r, plan.CommitFailed, "commit", err)
 }
 
-func refusedAt(root, category string, dryRun bool, err error) plan.Result {
+func refusedAt(root, invocation, category string, dryRun bool, err error) plan.Result {
 	r := plan.NewResult(root, plan.Refused, dryRun, nil)
+	setInvocation(&r, root, invocation)
 	r.Refusal = &plan.Refusal{Category: category, Message: err.Error(), Remediation: "resolve the reported preflight error and retry"}
+	return r
+}
+
+func failedAt(root, invocation string, outcome plan.Outcome, category string, err error) plan.Result {
+	r := plan.NewResult(root, outcome, false, nil)
+	setInvocation(&r, root, invocation)
+	r.Refusal = &plan.Refusal{Category: category, Message: err.Error(), Remediation: "resolve the repository transaction error and retry"}
+	return r
+}
+
+func commitFailed(r plan.Result, outcome plan.Outcome, category string, err error) plan.Result {
+	r.Outcome, r.NextStep = outcome, ""
+	r.Refusal = &plan.Refusal{Category: category, Message: err.Error(), Remediation: "resolve the repository transaction error and retry"}
 	return r
 }

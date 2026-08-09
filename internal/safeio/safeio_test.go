@@ -1,4 +1,4 @@
-package safeio
+package safeio_test
 
 import (
 	"bytes"
@@ -8,14 +8,15 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gentle-ai/agent-ready/internal/app"
+	"github.com/JhonMA82/agent-ready/internal/app"
+	"github.com/JhonMA82/agent-ready/internal/safeio"
 )
 
 func TestCommitOrdersManifestLastAndPreservesDesiredModes(t *testing.T) {
 	root := t.TempDir()
 	p := mustPlan(t, root)
 	var order []string
-	_, err := Commit(p, Options{Hook: func(phase, path string) error {
+	_, err := safeio.Commit(p, safeio.Options{Hook: func(phase, path string) error {
 		if phase == "commit" {
 			order = append(order, path)
 		}
@@ -51,10 +52,10 @@ func TestCommitRevalidatesAllStateBeforeWriting(t *testing.T) {
 	if err := os.WriteFile(path, []byte("late change"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Commit(p, Options{}); err == nil {
+	if _, err := safeio.Commit(p, safeio.Options{}); err == nil {
 		t.Fatal("expected revalidation failure")
 	}
-	if _, err := os.Stat(filepath.Join(root, journalName)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, ".agent-ready/transaction.json")); !os.IsNotExist(err) {
 		t.Fatalf("journal must not be written: %v", err)
 	}
 	for _, c := range p.Changes()[1:] {
@@ -73,7 +74,7 @@ func TestCommitFailureRollsBackExactPriorState(t *testing.T) {
 	}
 	p := mustPlan(t, root)
 	commits := 0
-	_, err := Commit(p, Options{Hook: func(phase, _ string) error {
+	_, err := safeio.Commit(p, safeio.Options{Hook: func(phase, _ string) error {
 		if phase == "commit" {
 			commits++
 			if commits == 2 {
@@ -92,7 +93,7 @@ func TestIncompleteRollbackRetainsRecoverableJournal(t *testing.T) {
 	root := t.TempDir()
 	p := mustPlan(t, root)
 	commits := 0
-	result, err := Commit(p, Options{Hook: func(phase, _ string) error {
+	result, err := safeio.Commit(p, safeio.Options{Hook: func(phase, _ string) error {
 		switch phase {
 		case "commit":
 			commits++
@@ -107,7 +108,7 @@ func TestIncompleteRollbackRetainsRecoverableJournal(t *testing.T) {
 	if err == nil || result.RecoveryPath == "" {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
-	if _, err := Recover(root, Options{}); err != nil {
+	if _, err := safeio.Recover(root, safeio.Options{}); err != nil {
 		t.Fatal(err)
 	}
 	assertPriorState(t, root, p, nil, 0)
@@ -141,7 +142,7 @@ func assertPriorState(t *testing.T, root string, p app.Plan, config []byte, mode
 			t.Fatalf("config mode: %v", err)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(root, journalName)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, ".agent-ready/transaction.json")); !os.IsNotExist(err) {
 		t.Fatalf("journal remains: %v", err)
 	}
 }

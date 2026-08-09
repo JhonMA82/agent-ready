@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gentle-ai/agent-ready/internal/opencode"
-	"github.com/gentle-ai/agent-ready/internal/plan"
+	"github.com/JhonMA82/agent-ready/internal/opencode"
+	"github.com/JhonMA82/agent-ready/internal/plan"
 )
 
 func TestDryRunPlanAndOwnedRerun(t *testing.T) {
@@ -33,9 +33,9 @@ func TestDryRunPlanAndOwnedRerun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dry, refused := Result(p, true), Result(p, false)
-	if dry.Outcome != plan.DryRun || refused.Outcome != plan.Refused || !reflect.DeepEqual(dry.Actions, refused.Actions) {
-		t.Fatalf("dry/refused plans differ: %#v %#v", dry, refused)
+	dry, changed := Result(p, "", true), Result(p, "", false)
+	if dry.Outcome != plan.DryRun || changed.Outcome != plan.Changed || changed.NextStep != "/agent-ready" || !reflect.DeepEqual(dry.Actions, changed.Actions) {
+		t.Fatalf("dry/changed plans differ: %#v %#v", dry, changed)
 	}
 	if got := Init(context.Background(), true); !reflect.DeepEqual(got.Actions, dry.Actions) {
 		t.Fatalf("runtime dry-run differs: %#v", got)
@@ -60,5 +60,11 @@ func TestDryRunPlanAndOwnedRerun(t *testing.T) {
 	}
 	if got := Init(context.Background(), false); got.Outcome != plan.Noop {
 		t.Fatalf("rerun result = %#v", got)
+	}
+	if got := Result(p, root, true); got.Invocation != "" {
+		t.Fatalf("equal invocation must be omitted: %+v", got)
+	}
+	if got := Result(p, root+"/nested", true); got.Invocation != root+"/nested" {
+		t.Fatalf("nested invocation must be reported: %+v", got)
 	}
 }

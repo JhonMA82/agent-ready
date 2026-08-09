@@ -4,9 +4,9 @@ import (
 	"context"
 	"os"
 
-	"github.com/gentle-ai/agent-ready/internal/app"
-	"github.com/gentle-ai/agent-ready/internal/cli"
-	"github.com/gentle-ai/agent-ready/internal/plan"
+	"github.com/JhonMA82/agent-ready/internal/app"
+	"github.com/JhonMA82/agent-ready/internal/cli"
+	"github.com/JhonMA82/agent-ready/internal/plan"
 )
 
 func main() {
