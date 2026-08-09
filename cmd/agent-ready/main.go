@@ -17,8 +17,45 @@ import (
 	"github.com/JhonMA82/agent-ready/internal/validation"
 )
 
+// refusedLifecycle renders a refused plan.Result for lifecycle commands.
+func refusedLifecycle(root, category string, dryRun bool, err error) plan.Result {
+	r := plan.NewResult(root, plan.Refused, dryRun, nil)
+	r.Refusal = &plan.Refusal{Category: category, Message: err.Error(), Remediation: "resolve the reported error and retry"}
+	return r
+}
+
 func main() {
 	run := func(ctx context.Context, options cli.Options) plan.Result { return app.Init(ctx, options.DryRun) }
+	update := func(ctx context.Context, options cli.Options) plan.Result {
+		selection, err := repository.Discover(ctx, "", "git")
+		if err != nil {
+			return refusedLifecycle("", "repository", options.DryRun, err)
+		}
+		p, err := lifecycle.UpdatePlan(selection.Root)
+		if err != nil {
+			return refusedLifecycle(selection.Root, "plan", options.DryRun, err)
+		}
+		actions := make([]plan.Action, 0, len(p.Changes()))
+		allNoop := true
+		for _, change := range p.Changes() {
+			actions = append(actions, plan.Action{Kind: change.Kind(), Path: change.Path()})
+			allNoop = allNoop && change.Kind() == "noop"
+		}
+		if options.DryRun {
+			return plan.NewResult(selection.Root, plan.DryRun, true, actions)
+		}
+		if allNoop {
+			return plan.NewResult(selection.Root, plan.Noop, false, actions)
+		}
+		if err := lifecycle.ApplyUpdate(p); err != nil {
+			r := plan.NewResult(selection.Root, plan.CommitFailed, false, actions)
+			r.Refusal = &plan.Refusal{Category: "commit", Message: err.Error(), Remediation: "resolve the transaction error and retry"}
+			return r
+		}
+		r := plan.NewResult(selection.Root, plan.Changed, false, actions)
+		r.NextStep = "/agent-ready"
+		return r
+	}
 	inspect := cli.Helper{
 		Name: "inspect",
 		Run: func(ctx context.Context, _ cli.Options) (any, error) {
@@ -116,7 +153,7 @@ func main() {
 		}
 		return facts, nil
 	}}
-	if err := cli.NewRoot(run, inspect, validate, ckpt, changes, state, toolsCmd, status, doctor).Execute(); err != nil {
+	if err := cli.NewRootWithCommands(run, update, inspect, validate, ckpt, changes, state, toolsCmd, status, doctor).Execute(); err != nil {
 		if exit, ok := err.(cli.ExitError); ok {
 			os.Exit(exit.Code)
 		}

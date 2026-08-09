@@ -34,10 +34,16 @@ type ExitError struct{ Code int }
 
 func (e ExitError) Error() string { return fmt.Sprintf("exit status %d", e.Code) }
 
-// NewRoot builds the root command: init (unchanged) plus one subcommand per
-// Helper with the helper exit-code contract (0 success / 1 failure); helpers
-// with Subs become parent commands (e.g. checkpoint save/status).
+// NewRoot builds the root command: init plus one subcommand per Helper with
+// the helper exit-code contract (0 success / 1 failure); helpers with Subs
+// become parent commands (e.g. checkpoint save/status).
 func NewRoot(run Runner, helpers ...Helper) *cobra.Command {
+	return NewRootWithCommands(run, nil, helpers...)
+}
+
+// NewRootWithCommands additionally wires lifecycle commands such as update
+// (plan.Result semantics, --dry-run) alongside init.
+func NewRootWithCommands(run Runner, update Runner, helpers ...Helper) *cobra.Command {
 	root := &cobra.Command{Use: "agent-ready", Short: "Prepare a repository for agent-ready workflows", SilenceErrors: true, SilenceUsage: true}
 	var options Options
 	init := &cobra.Command{Use: "init", Short: "Initialize the containing repository", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
@@ -53,6 +59,21 @@ func NewRoot(run Runner, helpers ...Helper) *cobra.Command {
 	init.Flags().BoolVar(&options.DryRun, "dry-run", false, "show the plan without writing")
 	init.Flags().BoolVar(&options.JSON, "json", false, "render one JSON result")
 	root.AddCommand(init)
+	if update != nil {
+		upd := &cobra.Command{Use: "update", Short: "Refresh installed harness assets", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+			r := update(cmd.Context(), options)
+			if err := Render(cmd.OutOrStdout(), r, options.JSON); err != nil {
+				return err
+			}
+			if code := plan.ExitCode(r); code != 0 {
+				return ExitError{Code: code}
+			}
+			return nil
+		}}
+		upd.Flags().BoolVar(&options.DryRun, "dry-run", false, "show the plan without writing")
+		upd.Flags().BoolVar(&options.JSON, "json", false, "render one JSON result")
+		root.AddCommand(upd)
+	}
 	for _, helper := range helpers {
 		if len(helper.Subs) > 0 {
 			root.AddCommand(parentFor(helper, &options))

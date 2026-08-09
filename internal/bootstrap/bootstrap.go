@@ -144,6 +144,25 @@ func Plan(root, config string) ([]File, error) {
 	return assets, nil
 }
 
+// Desired returns the deterministic embedded asset files plus the desired
+// manifest, WITHOUT ownership validation (used by lifecycle update to
+// reconcile drift). configFile is the installed config owner recorded by the
+// installed manifest. Plan keeps init's strict ownership semantics.
+func Desired(configFile string) ([]File, error) {
+	marker, assets, err := walkAssets()
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(assets, func(i, j int) bool { return assets[i].Path < assets[j].Path })
+	desiredManifest, err := canonicalManifest(marker, configFile, assets)
+	if err != nil {
+		return nil, err
+	}
+	assets = append(assets, File{Path: ".agent-ready/manifest.json", After: desiredManifest, Mode: 0o644})
+	sort.Slice(assets, func(i, j int) bool { return assets[i].Path < assets[j].Path })
+	return assets, nil
+}
+
 func canonicalManifest(marker []byte, config string, files []File) ([]byte, error) {
 	var m manifest
 	if err := json.Unmarshal(marker, &m); err != nil {
