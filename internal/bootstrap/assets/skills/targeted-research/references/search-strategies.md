@@ -17,6 +17,7 @@ How to close an evidence gap with the smallest useful search. Read this referenc
 
 - **Concrete question**: state what decision the research supports before searching; a question without a decision is a topic, not research.
 - **Exact version**: search against the version actually in the repository — pinned OpenCode 1.18.15, the dependency version, or the version the question names. Never accept advice for an unspecified or different version.
+- **Tool facts first**: when a decision involves tool capabilities, run `agent-ready tools status --json` (and `tools recommend --json` for candidate evidence) when available and treat the output as FACT. When the command is absent, reason from repository signals and note candidates without blocking — never invent tool state.
 - **Provenance**: every answer records its source and version; a source-less answer is UNKNOWN, not FACT.
 - **Stopping condition**: stop at the first ladder step that answers the question with a source. Escalating the ladder is justified only when the current step fails.
 - **No tool, no block**: absence of a search provider never blocks the audit; derive from local sources or stop with ASK_USER (tool candidates may be noted; Tool Manager is out of scope).

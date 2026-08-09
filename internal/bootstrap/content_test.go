@@ -354,7 +354,7 @@ func TestOrchestratorAnalysisContent(t *testing.T) {
 		}
 	}
 	auditFlow := readAsset(t, "assets/skills/agent-ready-orchestrator/references/audit-flow.md")
-	for _, marker := range []string{"exploration_plan", "NO_ACTION", "checkpoint save"} {
+	for _, marker := range []string{"exploration_plan", "NO_ACTION", "checkpoint save", "tools status --json", "degrade gracefully"} {
 		if !strings.Contains(auditFlow, marker) {
 			t.Fatalf("audit-flow missing %q", marker)
 		}
@@ -487,7 +487,7 @@ func TestResearchDesignEvolutionContent(t *testing.T) {
 	}
 
 	strategies := readAsset(t, "assets/skills/targeted-research/references/search-strategies.md")
-	for _, marker := range []string{"Repository itself", "Version metadata", "Official documentation", "specialized provider", "Broader web", "Stopping condition", "Exact version", "Provenance"} {
+	for _, marker := range []string{"Repository itself", "Version metadata", "Official documentation", "specialized provider", "Broader web", "Stopping condition", "Exact version", "Provenance", "tools status --json", "candidate evidence", "never invent tool state"} {
 		if !strings.Contains(strategies, marker) {
 			t.Fatalf("search-strategies missing %q", marker)
 		}
