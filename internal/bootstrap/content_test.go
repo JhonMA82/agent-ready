@@ -201,3 +201,121 @@ func TestCanonicalExamplesContent(t *testing.T) {
 		}
 	}
 }
+
+// TestOrchestratorAnalysisContent locks the PR4 skill pair (R3, R11-R15): the
+// orchestrator is the real adaptive-loop skill (mode dispatch, no rigid
+// sequence, no override keys) with its four references (audit-flow,
+// resume-rules, stop-conditions, token-discipline); repository-analysis ships
+// the FACT/INFERENCE/UNKNOWN discipline with its two references
+// (evidence-labels, inventory-facts). Frontmatter is valid for the pinned
+// runtime and every reference resolves and routes per design D2.
+func TestOrchestratorAnalysisContent(t *testing.T) {
+	namePattern := regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+	for _, name := range []string{"agent-ready-orchestrator", "repository-analysis"} {
+		rel := "skills/" + name + "/SKILL.md"
+		doc := readAsset(t, "assets/"+rel)
+		if want := filepath.FromSlash(".agent-ready/" + rel); mustRoute(t, rel) != want {
+			t.Fatalf("route(%s) != %q", rel, want)
+		}
+		if !strings.Contains(doc, "name: "+name) {
+			t.Fatalf("%s: frontmatter name missing", name)
+		}
+		if !namePattern.MatchString(name) {
+			t.Fatalf("%s: name pattern violation", name)
+		}
+		if desc := frontmatterDescription(t, doc); len(desc) < 1 || len(desc) > 250 || !strings.HasPrefix(desc, "Trigger:") {
+			t.Fatalf("%s: description must be 1-250 chars and trigger-first", name)
+		}
+	}
+
+	orch := readAsset(t, "assets/skills/agent-ready-orchestrator/SKILL.md")
+	if !strings.Contains(orch, "## Mode Dispatch") {
+		t.Fatal("orchestrator must dispatch modes")
+	}
+	for _, mode := range []string{"audit", "sync", "review", "status"} {
+		if !regexp.MustCompile(`(?m)^- ` + mode + `\b`).MatchString(orch) {
+			t.Fatalf("orchestrator mode dispatch missing %q", mode)
+		}
+	}
+	if !strings.Contains(orch, "## Adaptive Loop") {
+		t.Fatal("orchestrator must run an adaptive loop")
+	}
+	for _, marker := range []string{"evidence", "confidence", "NO_ACTION"} {
+		if !strings.Contains(orch, marker) {
+			t.Fatalf("orchestrator adaptive loop missing %q", marker)
+		}
+	}
+	if !strings.Contains(orch, "rigid sequence") {
+		t.Fatal("orchestrator must state the loop is not a rigid sequence")
+	}
+	if regexp.MustCompile(`(?m)^(model|agent|subtask):`).MatchString(orch) {
+		t.Fatal("orchestrator must not specify model/agent/subtask overrides (R7)")
+	}
+	for _, name := range []string{"audit-flow", "resume-rules", "stop-conditions", "token-discipline"} {
+		rel := "skills/agent-ready-orchestrator/references/" + name + ".md"
+		if readAsset(t, "assets/"+rel) == "" {
+			t.Fatalf("%s is empty", rel)
+		}
+		if want := filepath.FromSlash(".agent-ready/" + rel); mustRoute(t, rel) != want {
+			t.Fatalf("route(%s) != %q", rel, want)
+		}
+		if !strings.Contains(orch, "references/"+name+".md") {
+			t.Fatalf("orchestrator body must name references/%s.md", name)
+		}
+	}
+	auditFlow := readAsset(t, "assets/skills/agent-ready-orchestrator/references/audit-flow.md")
+	for _, marker := range []string{"exploration_plan", "NO_ACTION", "checkpoint save"} {
+		if !strings.Contains(auditFlow, marker) {
+			t.Fatalf("audit-flow missing %q", marker)
+		}
+	}
+	resume := readAsset(t, "assets/skills/agent-ready-orchestrator/references/resume-rules.md")
+	for _, marker := range []string{"checkpoint", "hash changed", "NO_ACTION"} {
+		if !strings.Contains(resume, marker) {
+			t.Fatalf("resume-rules missing %q", marker)
+		}
+	}
+	stop := readAsset(t, "assets/skills/agent-ready-orchestrator/references/stop-conditions.md")
+	for _, marker := range []string{"ASK_USER", "STOP_WITH_CONCERNS", "no-new-evidence"} {
+		if !strings.Contains(stop, marker) {
+			t.Fatalf("stop-conditions missing %q", marker)
+		}
+	}
+	tokens := readAsset(t, "assets/skills/agent-ready-orchestrator/references/token-discipline.md")
+	for _, marker := range []string{"smallest useful context", "Reuse checkpointed evidence", "on demand"} {
+		if !strings.Contains(tokens, marker) {
+			t.Fatalf("token-discipline missing %q", marker)
+		}
+	}
+
+	analysis := readAsset(t, "assets/skills/repository-analysis/SKILL.md")
+	for _, label := range []string{"FACT", "INFERENCE", "UNKNOWN"} {
+		if !strings.Contains(analysis, label) {
+			t.Fatalf("repository-analysis missing evidence label %q", label)
+		}
+	}
+	for _, name := range []string{"evidence-labels", "inventory-facts"} {
+		rel := "skills/repository-analysis/references/" + name + ".md"
+		if readAsset(t, "assets/"+rel) == "" {
+			t.Fatalf("%s is empty", rel)
+		}
+		if want := filepath.FromSlash(".agent-ready/" + rel); mustRoute(t, rel) != want {
+			t.Fatalf("route(%s) != %q", rel, want)
+		}
+		if !strings.Contains(analysis, "references/"+name+".md") {
+			t.Fatalf("repository-analysis body must name references/%s.md", name)
+		}
+	}
+	labels := readAsset(t, "assets/skills/repository-analysis/references/evidence-labels.md")
+	for _, label := range []string{"FACT", "INFERENCE", "UNKNOWN"} {
+		if !strings.Contains(labels, label) {
+			t.Fatalf("evidence-labels missing %q", label)
+		}
+	}
+	inventory := readAsset(t, "assets/skills/repository-analysis/references/inventory-facts.md")
+	for _, source := range []string{"inspect", "state", "changes", "checkpoint status"} {
+		if !strings.Contains(inventory, source) {
+			t.Fatalf("inventory-facts missing source %q", source)
+		}
+	}
+}
