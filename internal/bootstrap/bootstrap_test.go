@@ -2,6 +2,10 @@ package bootstrap
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -60,5 +64,103 @@ func TestPlanRefusesConflicts(t *testing.T) {
 				t.Fatalf("error = %v", err)
 			}
 		})
+	}
+}
+
+// TestEmbeddedWalkMatchesPlannedAssets locks the data-driven golden: every
+// embedded asset (other than the manifest marker) is routed to exactly one
+// planned file whose bytes are identical to the embedded walk, and the plan
+// contains no other assets.
+func TestEmbeddedWalkMatchesPlannedAssets(t *testing.T) {
+	root := t.TempDir()
+	files, err := Plan(root, "opencode.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	planned := map[string]File{}
+	for _, file := range files {
+		planned[file.Path] = file
+	}
+	var embedded int
+	err = fs.WalkDir(assetsFS, "assets", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || path == "assets/manifest.json" {
+			return nil
+		}
+		embedded++
+		rel := strings.TrimPrefix(path, "assets/")
+		target, err := route(rel)
+		if err != nil {
+			t.Fatalf("unroutable embedded asset %q: %v", path, err)
+		}
+		file, ok := planned[target]
+		if !ok {
+			t.Fatalf("embedded asset %q is not planned at %q", path, target)
+		}
+		data, err := assetsFS.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(file.After, data) {
+			t.Fatalf("planned bytes for %q differ from the embedded walk", target)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(planned) != embedded+1 {
+		t.Fatalf("plan has %d files, embedded walk has %d assets", len(planned), embedded)
+	}
+}
+
+// TestCanonicalManifestHashesCoverAllAssets locks the ownership golden: the
+// desired manifest lists every planned asset with its exact sha256 and mode,
+// and keeps the schema and the bumped install_version.
+func TestCanonicalManifestHashesCoverAllAssets(t *testing.T) {
+	root := t.TempDir()
+	files, err := Plan(root, "opencode.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var desired []byte
+	assets := map[string][]byte{}
+	for _, file := range files {
+		if file.Path == ".agent-ready/manifest.json" {
+			desired = file.After
+			continue
+		}
+		assets[file.Path] = file.After
+	}
+	if desired == nil {
+		t.Fatal("desired manifest missing from plan")
+	}
+	var m manifest
+	if err := json.Unmarshal(desired, &m); err != nil {
+		t.Fatal(err)
+	}
+	if m.Schema != "agent-ready.manifest/v1" || m.InstallVersion != "2" || m.CompatibilityVersion != "1.18.15" {
+		t.Fatalf("manifest marker = %+v", m)
+	}
+	if m.ConfigFile != "opencode.json" || m.ConfigPath != "./.agent-ready/skills" {
+		t.Fatalf("config fields = %q %q", m.ConfigFile, m.ConfigPath)
+	}
+	if len(m.Assets) != len(assets) {
+		t.Fatalf("manifest lists %d assets, plan has %d", len(m.Assets), len(assets))
+	}
+	for _, a := range m.Assets {
+		after, ok := assets[a.Path]
+		if !ok {
+			t.Fatalf("manifest lists unplanned asset %q", a.Path)
+		}
+		sum := sha256.Sum256(after)
+		if a.SHA256 != fmt.Sprintf("%x", sum) {
+			t.Fatalf("manifest hash mismatch for %q", a.Path)
+		}
+		if a.Mode != uint32(0o644) {
+			t.Fatalf("manifest mode for %q = %o", a.Path, a.Mode)
+		}
 	}
 }

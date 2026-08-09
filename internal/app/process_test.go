@@ -75,6 +75,11 @@ func TestProcessAcceptance(t *testing.T) {
 			t.Fatalf("command contains %s", forbidden)
 		}
 	}
+	for _, mode := range []string{"audit", "sync", "review", "status"} {
+		if !bytes.Contains(command, []byte(mode)) {
+			t.Fatalf("command does not dispatch mode %s", mode)
+		}
+	}
 	installed := snapshot(t, repo)
 	rerun := runJSON(t, binary, repo, env, 0, "init", "--json")
 	if rerun.Outcome != plan.Noop || rerun.NextStep != "/agent-ready" || !reflect.DeepEqual(installed, snapshot(t, repo)) {

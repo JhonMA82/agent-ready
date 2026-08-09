@@ -3,23 +3,67 @@ package bootstrap
 import (
 	"bytes"
 	"crypto/sha256"
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
-//go:embed assets/manifest.json
-var marker []byte
+//go:embed assets
+var assetsFS embed.FS
 
-//go:embed assets/skills/agent-ready-orchestrator/SKILL.md
-var skill []byte
+// walkAssets walks the embedded assets tree, returning the manifest marker
+// and every other asset routed to its installed location.
+func walkAssets() ([]byte, []File, error) {
+	var marker []byte
+	var files []File
+	err := fs.WalkDir(assetsFS, "assets", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		data, err := assetsFS.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		rel := strings.TrimPrefix(path, "assets/")
+		if rel == "manifest.json" {
+			marker = bytes.Clone(data)
+			return nil
+		}
+		target, err := route(rel)
+		if err != nil {
+			return err
+		}
+		files = append(files, File{Path: target, After: data, Mode: 0o644})
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return marker, files, nil
+}
 
-//go:embed assets/commands/agent-ready.md
-var command []byte
+// route maps an embedded asset path to its installed target.
+func route(rel string) (string, error) {
+	trees := []struct{ src, dst string }{
+		{"skills/", ".agent-ready/skills/"},
+		{"references/", ".agent-ready/references/"},
+		{"commands/", ".opencode/commands/"},
+	}
+	for _, tree := range trees {
+		if strings.HasPrefix(rel, tree.src) {
+			return filepath.FromSlash(tree.dst + strings.TrimPrefix(rel, tree.src)), nil
+		}
+	}
+	return "", fmt.Errorf("embedded asset outside routed trees: assets/%s", rel)
+}
 
 type File struct {
 	Path          string
@@ -43,12 +87,12 @@ type asset struct {
 
 // Plan validates canonical ownership and returns deterministic desired files.
 func Plan(root, config string) ([]File, error) {
-	assets := []File{
-		{Path: ".agent-ready/skills/agent-ready-orchestrator/SKILL.md", After: bytes.Clone(skill), Mode: 0o644},
-		{Path: ".opencode/commands/agent-ready.md", After: bytes.Clone(command), Mode: 0o644},
+	marker, assets, err := walkAssets()
+	if err != nil {
+		return nil, err
 	}
 	sort.Slice(assets, func(i, j int) bool { return assets[i].Path < assets[j].Path })
-	desiredManifest, err := canonicalManifest(config, assets)
+	desiredManifest, err := canonicalManifest(marker, config, assets)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +144,7 @@ func Plan(root, config string) ([]File, error) {
 	return assets, nil
 }
 
-func canonicalManifest(config string, files []File) ([]byte, error) {
+func canonicalManifest(marker []byte, config string, files []File) ([]byte, error) {
 	var m manifest
 	if err := json.Unmarshal(marker, &m); err != nil {
 		return nil, fmt.Errorf("invalid embedded manifest marker: %w", err)
