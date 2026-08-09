@@ -16,6 +16,7 @@ type Options struct {
 	Target   string // validate --target (empty: discover from cwd)
 	Stage    string // checkpoint save --stage
 	Complete bool   // checkpoint save --complete
+	Tool     string // tools install --tool
 }
 type Runner func(context.Context, Options) plan.Result
 
@@ -104,6 +105,10 @@ func parentFor(helper Helper, options *Options) *cobra.Command {
 		if nested.Name == "save" {
 			child.Flags().StringVar(&options.Stage, "stage", "", "checkpoint stage (e.g. exploration_plan)")
 			child.Flags().BoolVar(&options.Complete, "complete", false, "mark the checkpoint complete")
+		}
+		if nested.Name == "install" {
+			child.Flags().StringVar(&options.Tool, "tool", "", "tool id to install (e.g. rg)")
+			child.Flags().BoolVar(&options.DryRun, "dry-run", false, "render the plan without executing")
 		}
 		sub.AddCommand(child)
 	}

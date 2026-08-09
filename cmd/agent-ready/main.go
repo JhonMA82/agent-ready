@@ -82,7 +82,24 @@ func main() {
 		return facts, nil
 	})}
 	toolsRecommend := cli.Helper{Name: "recommend", Run: withRoot(func(root string) (any, error) { return tools.Recommend(root) })}
-	toolsCmd := cli.Helper{Name: "tools", Subs: []cli.Helper{toolsStatus, toolsDoctor, toolsRecommend}}
+	toolsInstall := cli.Helper{Name: "install", Run: func(_ context.Context, options cli.Options) (any, error) {
+		plan, err := tools.Plan(options.Tool)
+		if err != nil {
+			return nil, err
+		}
+		if options.DryRun {
+			return plan, nil
+		}
+		approved, err := tools.ConfirmConsent(os.Stdin, plan)
+		if err != nil {
+			return nil, err
+		}
+		if !approved {
+			return plan, errors.New("installation cancelled; nothing was executed")
+		}
+		return tools.Install(plan)
+	}}
+	toolsCmd := cli.Helper{Name: "tools", Subs: []cli.Helper{toolsStatus, toolsDoctor, toolsRecommend, toolsInstall}}
 	if err := cli.NewRoot(run, inspect, validate, ckpt, changes, state, toolsCmd).Execute(); err != nil {
 		if exit, ok := err.(cli.ExitError); ok {
 			os.Exit(exit.Code)
