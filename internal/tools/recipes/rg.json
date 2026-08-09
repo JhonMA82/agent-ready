@@ -1,0 +1,1 @@
+{"id":"rg","executables":["rg"],"version_args":["--version"],"install":{"apt":{"executable":"apt","args":["install","-y","ripgrep"]},"pacman":{"executable":"pacman","args":["-S","--needed","ripgrep"]},"dnf":{"executable":"dnf","args":["install","-y","ripgrep"]}}}

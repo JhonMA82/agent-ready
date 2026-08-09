@@ -1,0 +1,1 @@
+{"id":"fd","executables":["fd","fdfind"],"version_args":["--version"],"install":{"apt":{"executable":"apt","args":["install","-y","fd-find"]},"pacman":{"executable":"pacman","args":["-S","--needed","fd"]},"dnf":{"executable":"dnf","args":["install","-y","fd-find"]},"brew":{"executable":"brew","args":["install","fd"]}}}

@@ -1,0 +1,1 @@
+{"id":"gh","executables":["gh"],"version_args":["--version"],"install":{"apt":{"executable":"apt","args":["install","-y","gh"]},"pacman":{"executable":"pacman","args":["-S","--needed","github-cli"]},"dnf":{"executable":"dnf","args":["install","-y","gh"]},"brew":{"executable":"brew","args":["install","gh"]}}}

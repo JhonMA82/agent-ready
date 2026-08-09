@@ -1,0 +1,1 @@
+{"id":"ast-grep","executables":["ast-grep"],"version_args":["--version"],"install":{"brew":{"executable":"brew","args":["install","ast-grep"]}}}

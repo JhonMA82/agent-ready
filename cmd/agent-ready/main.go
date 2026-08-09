@@ -12,6 +12,7 @@ import (
 	"github.com/JhonMA82/agent-ready/internal/plan"
 	"github.com/JhonMA82/agent-ready/internal/repository"
 	statestore "github.com/JhonMA82/agent-ready/internal/state"
+	"github.com/JhonMA82/agent-ready/internal/tools"
 	"github.com/JhonMA82/agent-ready/internal/validation"
 )
 
@@ -69,7 +70,9 @@ func main() {
 	}}
 	changes := cli.Helper{Name: "changes", Run: withRoot(func(root string) (any, error) { return checkpoint.Changes(root) })}
 	state := cli.Helper{Name: "state", Run: withRoot(func(root string) (any, error) { return statestore.Read(root) })}
-	if err := cli.NewRoot(run, inspect, validate, ckpt, changes, state).Execute(); err != nil {
+	toolsStatus := cli.Helper{Name: "status", Run: func(context.Context, cli.Options) (any, error) { return tools.Status() }}
+	toolsCmd := cli.Helper{Name: "tools", Subs: []cli.Helper{toolsStatus}}
+	if err := cli.NewRoot(run, inspect, validate, ckpt, changes, state, toolsCmd).Execute(); err != nil {
 		if exit, ok := err.(cli.ExitError); ok {
 			os.Exit(exit.Code)
 		}

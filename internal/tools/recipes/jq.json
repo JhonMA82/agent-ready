@@ -1,0 +1,1 @@
+{"id":"jq","executables":["jq"],"version_args":["--version"],"install":{"apt":{"executable":"apt","args":["install","-y","jq"]},"pacman":{"executable":"pacman","args":["-S","--needed","jq"]},"dnf":{"executable":"dnf","args":["install","-y","jq"]},"brew":{"executable":"brew","args":["install","jq"]}}}
