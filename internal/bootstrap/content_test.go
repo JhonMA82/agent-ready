@@ -319,3 +319,109 @@ func TestOrchestratorAnalysisContent(t *testing.T) {
 		}
 	}
 }
+
+// TestResearchDesignEvolutionContent locks the PR5 skill trio (R1, R11):
+// targeted-research, artifact-design, and incremental-evolution are embedded
+// and routed to .agent-ready/skills/ with valid frontmatter; targeted-research
+// owns the evidence-gap search ladder (repo first, exact version, provenance,
+// stopping condition), artifact-design owns the six artifact decisions
+// (CREATE/UPDATE/REUSE/REMOVE/NO_ACTION/ASK_USER) with no artifact spam, and
+// incremental-evolution owns selective sync (ChangeSet interpretation, no full
+// re-audit, not every dependency requires change). Each reference resolves and
+// routes per design D2.
+func TestResearchDesignEvolutionContent(t *testing.T) {
+	namePattern := regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+	for _, name := range []string{"targeted-research", "artifact-design", "incremental-evolution"} {
+		rel := "skills/" + name + "/SKILL.md"
+		doc := readAsset(t, "assets/"+rel)
+		if want := filepath.FromSlash(".agent-ready/" + rel); mustRoute(t, rel) != want {
+			t.Fatalf("route(%s) != %q", rel, want)
+		}
+		if !strings.Contains(doc, "name: "+name) {
+			t.Fatalf("%s: frontmatter name missing", name)
+		}
+		if !namePattern.MatchString(name) {
+			t.Fatalf("%s: name pattern violation", name)
+		}
+		if desc := frontmatterDescription(t, doc); len(desc) < 1 || len(desc) > 250 || !strings.HasPrefix(desc, "Trigger:") {
+			t.Fatalf("%s: description must be 1-250 chars and trigger-first", name)
+		}
+	}
+
+	research := readAsset(t, "assets/skills/targeted-research/SKILL.md")
+	if !strings.Contains(research, "references/search-strategies.md") {
+		t.Fatal("targeted-research body must name references/search-strategies.md")
+	}
+	for _, marker := range []string{"concrete question", "exact version", "source and version", "Stop when the question is answered", "never blocks"} {
+		if !strings.Contains(research, marker) {
+			t.Fatalf("targeted-research missing %q", marker)
+		}
+	}
+
+	design := readAsset(t, "assets/skills/artifact-design/SKILL.md")
+	if !strings.Contains(design, "references/artifact-decisions.md") {
+		t.Fatal("artifact-design body must name references/artifact-decisions.md")
+	}
+	for _, decision := range []string{"CREATE", "UPDATE", "REUSE", "REMOVE", "NO_ACTION", "ASK_USER"} {
+		if !strings.Contains(design, decision) {
+			t.Fatalf("artifact-design missing decision %q", decision)
+		}
+	}
+	for _, marker := range []string{"labeled evidence", "artifact spam", "UNKNOWN-only", "decisions.jsonl"} {
+		if !strings.Contains(design, marker) {
+			t.Fatalf("artifact-design missing %q", marker)
+		}
+	}
+
+	evolution := readAsset(t, "assets/skills/incremental-evolution/SKILL.md")
+	if !strings.Contains(evolution, "references/sync-flow.md") {
+		t.Fatal("incremental-evolution body must name references/sync-flow.md")
+	}
+	for _, marker := range []string{"ChangeSet", "changed paths", "Never re-run a full audit", "Not every dependency", "changes` and `checkpoint status"} {
+		if !strings.Contains(evolution, marker) {
+			t.Fatalf("incremental-evolution missing %q", marker)
+		}
+	}
+
+	for _, rel := range []string{
+		"skills/targeted-research/references/search-strategies.md",
+		"skills/artifact-design/references/artifact-decisions.md",
+		"skills/incremental-evolution/references/sync-flow.md",
+	} {
+		if readAsset(t, "assets/"+rel) == "" {
+			t.Fatalf("%s is empty", rel)
+		}
+		if want := filepath.FromSlash(".agent-ready/" + rel); mustRoute(t, rel) != want {
+			t.Fatalf("route(%s) != %q", rel, want)
+		}
+	}
+
+	strategies := readAsset(t, "assets/skills/targeted-research/references/search-strategies.md")
+	for _, marker := range []string{"Repository itself", "Version metadata", "Official documentation", "specialized provider", "Broader web", "Stopping condition", "Exact version", "Provenance"} {
+		if !strings.Contains(strategies, marker) {
+			t.Fatalf("search-strategies missing %q", marker)
+		}
+	}
+
+	decisions := readAsset(t, "assets/skills/artifact-design/references/artifact-decisions.md")
+	for _, decision := range []string{"CREATE", "UPDATE", "REUSE", "REMOVE", "NO_ACTION", "ASK_USER"} {
+		if !strings.Contains(decisions, decision) {
+			t.Fatalf("artifact-decisions missing decision %q", decision)
+		}
+	}
+	if !strings.Contains(decisions, "artifact spam") || !strings.Contains(decisions, "N skills generated") {
+		t.Fatal("artifact-decisions must forbid artifact spam and count-based evidence (R11)")
+	}
+
+	syncFlow := readAsset(t, "assets/skills/incremental-evolution/references/sync-flow.md")
+	for _, entry := range []string{"`added`", "`changed`", "`removed`", "`first_run`"} {
+		if !strings.Contains(syncFlow, entry) {
+			t.Fatalf("sync-flow missing ChangeSet entry %q", entry)
+		}
+	}
+	for _, marker := range []string{"Selective updates", "No full re-audit", "Not every dependency", "NO_ACTION"} {
+		if !strings.Contains(syncFlow, marker) {
+			t.Fatalf("sync-flow missing %q", marker)
+		}
+	}
+}
