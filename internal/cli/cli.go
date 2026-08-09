@@ -13,6 +13,7 @@ import (
 type Options struct {
 	DryRun bool
 	JSON   bool
+	Target string // validate --target (empty: discover from cwd)
 }
 type Runner func(context.Context, Options) plan.Result
 
@@ -49,8 +50,12 @@ func NewRoot(run Runner, helpers ...Helper) *cobra.Command {
 	for _, helper := range helpers {
 		sub := &cobra.Command{Use: helper.Name, Short: "Emit deterministic " + helper.Name + " facts", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 			value, err := helper.Run(cmd.Context(), options)
-			if err == nil {
-				err = RenderHelper(cmd.OutOrStdout(), value, options.JSON)
+			// Render a non-nil result even when Run failed so a failing
+			// helper (validate verdict fail) still emits facts before exit 1.
+			if value != nil {
+				if rerr := RenderHelper(cmd.OutOrStdout(), value, options.JSON); rerr != nil && err == nil {
+					err = rerr
+				}
 			}
 			if err != nil {
 				fmt.Fprintln(cmd.ErrOrStderr(), err)
@@ -59,6 +64,9 @@ func NewRoot(run Runner, helpers ...Helper) *cobra.Command {
 			return nil
 		}}
 		sub.Flags().BoolVar(&options.JSON, "json", false, "emit JSON facts")
+		if helper.Name == "validate" {
+			sub.Flags().StringVar(&options.Target, "target", "", "repository to validate (default: discovered from cwd)")
+		}
 		root.AddCommand(sub)
 	}
 	return root

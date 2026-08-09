@@ -79,3 +79,20 @@ func TestHelperContracts(t *testing.T) {
 		t.Fatalf("expected ExitError{1} with reason on stderr, got %v / %q", err, errOut.String())
 	}
 }
+
+func TestValidateHelperContracts(t *testing.T) {
+	var out, errOut bytes.Buffer
+	cmd := NewRoot(nil, Helper{Name: "validate", Run: func(context.Context, Options) (any, error) {
+		return summaryFacts{Total: 2}, errors.New("validation failed: 1 of 1 skills violate the pinned OpenCode 1.18.15 rules")
+	}})
+	cmd.SetArgs([]string{"validate"})
+	cmd.SetOut(&out)
+	cmd.SetErr(&errOut)
+	err := cmd.Execute()
+	if exit, ok := err.(ExitError); !ok || exit.Code != 1 {
+		t.Fatalf("expected ExitError{1}, got %v", err)
+	}
+	if !strings.Contains(out.String(), "files: 2") || !strings.Contains(errOut.String(), "validation failed") {
+		t.Fatalf("facts on stdout (%q) and reason on stderr (%q) required", out.String(), errOut.String())
+	}
+}
