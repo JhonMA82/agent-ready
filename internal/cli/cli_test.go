@@ -127,3 +127,22 @@ func TestValidateHelperContracts(t *testing.T) {
 		t.Fatalf("facts on stdout (%q) and reason on stderr (%q) required", out.String(), errOut.String())
 	}
 }
+
+func TestDoctorHelperExitContract(t *testing.T) {
+	// A Run error must yield ExitError{1} with facts still on stdout.
+	doctor := Helper{Name: "doctor", Run: func(context.Context, Options) (any, error) {
+		return summaryFacts{Total: 0}, errors.New("required tool checks failed")
+	}}
+	var out, errOut bytes.Buffer
+	cmd := NewRoot(nil, Helper{Name: "tools", Subs: []Helper{doctor}})
+	cmd.SetArgs([]string{"tools", "doctor"})
+	cmd.SetOut(&out)
+	cmd.SetErr(&errOut)
+	err := cmd.Execute()
+	if exit, ok := err.(ExitError); !ok || exit.Code != 1 {
+		t.Fatalf("expected ExitError{1}, got %v", err)
+	}
+	if !strings.Contains(out.String(), "files: 0") || !strings.Contains(errOut.String(), "required tool checks failed") {
+		t.Fatalf("facts on stdout (%q) and reason on stderr (%q) required", out.String(), errOut.String())
+	}
+}

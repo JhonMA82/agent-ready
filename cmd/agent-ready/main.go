@@ -71,7 +71,18 @@ func main() {
 	changes := cli.Helper{Name: "changes", Run: withRoot(func(root string) (any, error) { return checkpoint.Changes(root) })}
 	state := cli.Helper{Name: "state", Run: withRoot(func(root string) (any, error) { return statestore.Read(root) })}
 	toolsStatus := cli.Helper{Name: "status", Run: func(context.Context, cli.Options) (any, error) { return tools.Status() }}
-	toolsCmd := cli.Helper{Name: "tools", Subs: []cli.Helper{toolsStatus}}
+	toolsDoctor := cli.Helper{Name: "doctor", Run: withRoot(func(root string) (any, error) {
+		facts, err := tools.Doctor(root)
+		if err != nil {
+			return nil, err
+		}
+		if !facts.Healthy {
+			return facts, errors.New("required tool checks failed")
+		}
+		return facts, nil
+	})}
+	toolsRecommend := cli.Helper{Name: "recommend", Run: withRoot(func(root string) (any, error) { return tools.Recommend(root) })}
+	toolsCmd := cli.Helper{Name: "tools", Subs: []cli.Helper{toolsStatus, toolsDoctor, toolsRecommend}}
 	if err := cli.NewRoot(run, inspect, validate, ckpt, changes, state, toolsCmd).Execute(); err != nil {
 		if exit, ok := err.(cli.ExitError); ok {
 			os.Exit(exit.Code)
