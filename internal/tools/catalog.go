@@ -34,13 +34,110 @@ var recipesFS embed.FS
 // shellMeta rejects unverified free-form shell content in recipe args.
 var shellMeta = regexp.MustCompile(`[;&|<>$\x60\n]`)
 
-// Catalog returns the embedded verified recipes sorted by id.
-func Catalog() []Recipe {
+// Family identifies one of the three ordered catalog families; status output
+// always serializes them in fixed order: ecosystem, productivity, provider.
+type Family string
+
+const (
+	FamilyEcosystem    Family = "ecosystem"
+	FamilyProductivity Family = "productivity"
+	FamilyProvider     Family = "provider"
+)
+
+// CapabilityState is one independent support truth value; unsupported and
+// unknown stay distinguishable from supported (presence or recommendation
+// never implies install/configure/integration support).
+type CapabilityState string
+
+const (
+	Supported   CapabilityState = "supported"
+	Unsupported CapabilityState = "unsupported"
+	Unknown     CapabilityState = "unknown"
+)
+
+// Capabilities is the seven independent capability support states, always
+// serialized in this fixed order: detect, version, recommend, install,
+// configure, integration, side_effects.
+type Capabilities struct {
+	Detect      CapabilityState `json:"detect"`
+	Version     CapabilityState `json:"version"`
+	Recommend   CapabilityState `json:"recommend"`
+	Install     CapabilityState `json:"install"`
+	Configure   CapabilityState `json:"configure"`
+	Integration CapabilityState `json:"integration"`
+	SideEffects CapabilityState `json:"side_effects"`
+}
+
+// Entry is one catalog entry: stable identifier, family, detection metadata,
+// the verified install recipe when one exists, and the seven capability states.
+type Entry struct {
+	ID           string
+	Family       Family
+	Executables  []string
+	VersionArgs  []string
+	Install      map[string]RecipeOp
+	Capabilities Capabilities
+}
+
+// entrySpec is the authored capability-truth row; recipe-backed entries
+// inherit executables/version/install from their embedded recipe JSON.
+type entrySpec struct {
+	id          string
+	family      Family
+	caps        Capabilities
+	executables []string
+	versionArgs []string
+}
+
+// support is the single capability-truth table, sorted by stable identifier.
+// install: supported only where a verified embedded recipe exists and its
+// plan/execution/verification/consent behavior is tested.
+var support = []entrySpec{
+	{id: "ast-grep", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported)},
+	{id: "codegraph", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported)},
+	{id: "context7", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported)},
+	{id: "fd", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported)},
+	{id: "gh", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported)},
+	{id: "go", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"go"}, versionArgs: []string{"version"}},
+	{id: "jq", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported)},
+	{id: "node", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"node"}, versionArgs: []string{"--version"}},
+	{id: "rg", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported)},
+	{id: "rtk", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported)},
+	{id: "semble", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported)},
+}
+
+// caps is the positional seven-state constructor in Capabilities field order.
+func caps(detect, version, recommend, install, configure, integration, sideEffects CapabilityState) Capabilities {
+	return Capabilities{Detect: detect, Version: version, Recommend: recommend, Install: install, Configure: configure, Integration: integration, SideEffects: sideEffects}
+}
+
+// Catalog returns the single support-truth catalog: every entry with its
+// family and capability states, sorted by stable identifier; recipe-backed
+// entries carry their embedded verified recipe as the install contract.
+func Catalog() []Entry {
 	recipes, err := loadAll()
 	if err != nil {
 		panic("invalid embedded recipe catalog: " + err.Error())
 	}
-	return recipes
+	byID := make(map[string]Recipe, len(recipes))
+	for _, recipe := range recipes {
+		byID[recipe.ID] = recipe
+	}
+	entries := make([]Entry, 0, len(support))
+	for _, spec := range support {
+		entry := Entry{ID: spec.id, Family: spec.family, Capabilities: spec.caps}
+		if recipe, ok := byID[spec.id]; ok {
+			entry.Executables = recipe.Executables
+			entry.VersionArgs = recipe.VersionArgs
+			entry.Install = recipe.Install
+		} else {
+			entry.Executables = spec.executables
+			entry.VersionArgs = spec.versionArgs
+		}
+		entries = append(entries, entry)
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].ID < entries[j].ID })
+	return entries
 }
 
 // loadAll parses every embedded recipe file under recipes/.

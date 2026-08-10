@@ -55,7 +55,7 @@ func TestInstallExecutesRecipeAndVerifies(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Tool absent now; install should run the recipe and then find rg.
-	if present, _ := detect(Catalog()[4]); present {
+	if present, _ := detect(entryByID(t, "rg")); present {
 		t.Fatal("test precondition: rg must be absent before install")
 	}
 	// Add rg dir to PATH before install so verification passes.
@@ -99,6 +99,27 @@ func TestInstallRecipeFailureFailsClosed(t *testing.T) {
 	}
 	if _, err := Install(plan); err == nil || !strings.Contains(err.Error(), "install failed") {
 		t.Fatalf("recipe failure must fail closed, got %v", err)
+	}
+}
+
+func TestInstallSupportBackedByRecipe(t *testing.T) {
+	// install: supported must stay backed by the embedded recipe contract;
+	// install: unsupported tools must never become installable by implication.
+	for _, entry := range Catalog() {
+		hasRecipe := entry.Install != nil && len(entry.Install) > 0
+		if entry.Capabilities.Install == Supported && !hasRecipe {
+			t.Fatalf("%s claims install support without a recipe", entry.ID)
+		}
+		if hasRecipe && entry.Capabilities.Install != Supported {
+			t.Fatalf("%s has a recipe but install is %s", entry.ID, entry.Capabilities.Install)
+		}
+	}
+	aptDir := fakeExecutable(t, "apt", "#!/bin/sh\nexit 0\n")
+	t.Setenv("PATH", aptDir)
+	for _, id := range []string{"go", "node", "codegraph", "context7", "rtk", "semble"} {
+		if _, err := Plan(id); err == nil || !strings.Contains(err.Error(), "no verified install recipe") {
+			t.Fatalf("install: unsupported %s must fail closed without a recipe, got %v", id, err)
+		}
 	}
 }
 
