@@ -102,4 +102,52 @@ func TestInspectDeterministic(t *testing.T) {
 	if jb, _ := json.Marshal(b); string(ja) != string(jb) || !strings.Contains(string(ja), `"schema_version":"agent-ready.inspect/v1"`) {
 		t.Fatalf("non-deterministic or missing schema_version:\n%s\n%s", ja, jb)
 	}
+	if strings.Contains(string(ja), `"presence"`) {
+		t.Fatalf("legacy JSON unexpectedly includes empty presence facts: %s", ja)
+	}
+}
+
+func TestInspectPrunesHeavyTreesAndRetainsPresence(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "main.go", "package main\n")
+	for _, dir := range []string{"vendor", "target", "node_modules", "obj", ".venv", "bin"} {
+		write(t, root, dir+"/nested/ignored.js", "ignored\n")
+	}
+
+	wantPresence := []Presence{
+		{Path: ".venv", Kind: "directory"},
+		{Path: "bin", Kind: "directory"},
+		{Path: "node_modules", Kind: "directory"},
+		{Path: "obj", Kind: "directory"},
+		{Path: "target", Kind: "directory"},
+		{Path: "vendor", Kind: "directory"},
+	}
+	before, err := Inspect(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := fmt.Sprint(before.Presence), fmt.Sprint(wantPresence); got != want {
+		t.Fatalf("presence:\ngot  %s\nwant %s", got, want)
+	}
+	if got, want := fmt.Sprint(before.Files), fmt.Sprint(Files{Total: 1, ByExtension: map[string]int{"go": 1}}); got != want {
+		t.Fatalf("files include heavy-tree descendants:\ngot  %s\nwant %s", got, want)
+	}
+	paths, err := Paths(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := fmt.Sprint(paths), fmt.Sprint([]string{"main.go"}); got != want {
+		t.Fatalf("paths include heavy-tree descendants:\ngot  %s\nwant %s", got, want)
+	}
+
+	write(t, root, "node_modules/changed/.github/workflows/ci.yml", "name: ignored\n")
+	after, err := Inspect(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeJSON, _ := json.Marshal(before)
+	afterJSON, _ := json.Marshal(after)
+	if string(beforeJSON) != string(afterJSON) {
+		t.Fatalf("heavy-tree descendant changed facts:\nbefore %s\nafter  %s", beforeJSON, afterJSON)
+	}
 }
