@@ -151,3 +151,56 @@ func TestInspectPrunesHeavyTreesAndRetainsPresence(t *testing.T) {
 		t.Fatalf("heavy-tree descendant changed facts:\nbefore %s\nafter  %s", beforeJSON, afterJSON)
 	}
 }
+
+func TestInspectAttachesEcosystemFactsFromBoundedPaths(t *testing.T) {
+	root := t.TempDir()
+	for _, path := range []string{"go.mod", "go.sum", "package.json", "pnpm-workspace.yaml", "pyproject.toml", "uv.lock", "next.config.js", "pytest.ini", "Makefile", "gradlew"} {
+		data := "\n"
+		if path == "package.json" {
+			data = `{}`
+		}
+		write(t, root, path, data)
+	}
+	write(t, root, "node_modules/hidden/angular.json", "{}")
+
+	first, err := Inspect(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := Inspect(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, _ := json.Marshal(first)
+	b, _ := json.Marshal(second)
+	if string(a) != string(b) {
+		t.Fatalf("inspect bytes changed:\n%s\n%s", a, b)
+	}
+	got := string(a)
+	for _, required := range []string{
+		`"id":"go"`, `"id":"javascript"`, `"id":"python"`,
+		`"path":"go.mod"`, `"path":"package.json"`, `"path":"pyproject.toml"`,
+		`"path":"go.sum"`, `"path":"uv.lock"`, `"path":"pnpm-workspace.yaml"`,
+		`"path":"gradlew"`, `"path":"next.config.js"`, `"path":"Makefile"`, `"path":"pytest.ini"`,
+	} {
+		if !strings.Contains(got, required) {
+			t.Fatalf("missing %s in %s", required, got)
+		}
+	}
+	if strings.Contains(got, "angular") {
+		t.Fatalf("heavy-tree descendant became ecosystem evidence: %s", got)
+	}
+
+	plain := t.TempDir()
+	write(t, plain, "README.md", "# plain\n")
+	legacy, err := Inspect(plain, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyJSON, _ := json.Marshal(legacy)
+	for _, key := range []string{`"ecosystems"`, `"manifests"`, `"lockfiles"`, `"workspace_signals"`, `"project_wrappers"`, `"framework_signals"`, `"build_tools"`, `"test_tools"`} {
+		if strings.Contains(string(legacyJSON), key) {
+			t.Fatalf("legacy V1 JSON gained additive key %s: %s", key, legacyJSON)
+		}
+	}
+}

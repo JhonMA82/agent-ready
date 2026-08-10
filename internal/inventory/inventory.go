@@ -10,6 +10,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/JhonMA82/agent-ready/internal/ecosystem"
 )
 
 // SchemaVersion is the agent-ready.inspect/v1 fact schema.
@@ -48,6 +50,7 @@ type Facts struct {
 	Files         Files      `json:"files"`
 	CI            CI         `json:"ci"`
 	Presence      []Presence `json:"presence,omitempty"`
+	ecosystem.Facts
 }
 
 var manifests = []struct {
@@ -108,7 +111,7 @@ func Inspect(root, invocation string) (Facts, error) {
 	})
 	sort.Slice(scripts, func(i, j int) bool { return scripts[i].Name < scripts[j].Name })
 	sort.Strings(workspaces)
-	facts := Facts{SchemaVersion: SchemaVersion, Root: root, Deps: deps, Scripts: scripts, Workspaces: workspaces, Files: files, CI: findCI(paths), Presence: presence}
+	facts := Facts{SchemaVersion: SchemaVersion, Root: root, Deps: deps, Scripts: scripts, Workspaces: workspaces, Files: files, CI: findCI(paths), Presence: presence, Facts: ecosystem.Detect(paths)}
 	if invocation != "" && invocation != root {
 		facts.Invocation = invocation
 	}
