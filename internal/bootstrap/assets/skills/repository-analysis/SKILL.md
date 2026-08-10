@@ -17,6 +17,7 @@ Run when the orchestrator starts exploration, when a new finding needs classific
 2. Reuse checkpointed evidence before re-reading sources.
 3. Classify each finding per the evidence-labels discipline.
 4. Record the labeled evidence set with per-finding confidence in state.
+5. Feed the Tool / Capability Assessment: include tool/capability facts (`tools status`, `tools recommend`) in the labeled evidence set; every assessment claim cites evidence and a reason.
 
 ## Output Contract
-Return the evidence set: findings with FACT/INFERENCE/UNKNOWN labels, the source of each fact, and confidence for every decision-relevant finding.
+Return the evidence set: findings with FACT/INFERENCE/UNKNOWN labels, the source of each fact, confidence for every decision-relevant finding, and the tool/capability evidence behind every Tool / Capability Assessment claim.

@@ -60,6 +60,21 @@ func TestEmbeddedAssetUpgradeGate(t *testing.T) {
 	})
 }
 
+// TestEmbeddedAssetUpgradeGateSlice7 reruns the Slice 1 parameterized gate
+// over Slice 7's declared changed assets (task 4.2): the four initial-audit
+// contract files must advance unchanged, preserve modifications, install when
+// absent, and keep protected state intact. As in Slice 1, the new-marked
+// entry models an older install that lacks that path so the gate can prove
+// absent installation and unmanaged collisions for this slice's asset set.
+func TestEmbeddedAssetUpgradeGateSlice7(t *testing.T) {
+	runEmbeddedAssetUpgradeGate(t, "slice-7-driven-audit", []assetUpgrade{
+		{path: ".agent-ready/skills/agent-ready-orchestrator/SKILL.md", old: []byte("old orchestrator skill\n")},
+		{path: ".agent-ready/skills/repository-analysis/SKILL.md", old: []byte("old repository analysis\n")},
+		{path: ".agent-ready/skills/agent-ready-orchestrator/references/audit-flow.md", new: true},
+		{path: ".agent-ready/skills/repository-analysis/references/inventory-facts.md", old: []byte("old inventory facts\n")},
+	})
+}
+
 func runEmbeddedAssetUpgradeGate(t *testing.T, slice string, changedAssets []assetUpgrade) {
 	t.Helper()
 	t.Run(slice+"/advances-and-installs", func(t *testing.T) {

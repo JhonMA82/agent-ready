@@ -31,6 +31,6 @@ The stages of a full `/agent-ready audit` run. Read this reference when an audit
 
 Stages are a map, not a script: resume skips completed stages, new evidence revisits earlier stages, and the first applicable stop condition ends the run.
 
-## Tool capabilities
+## Tool / Capability Assessment
 
-Tool facts come from `agent-ready tools status --json` when the command is available; `tools recommend --json` offers candidate evidence the model weighs against the tool budget. Without the Tool Manager, reason from repository signals and degrade gracefully — missing tool facts never block a stage.
+Every successful initial audit MUST end with a categorized Tool / Capability Assessment covering three families — ecosystem (gh, go, node), productivity (ast-grep, fd, jq, rg), and provider (codegraph, context7). Tool facts come from `agent-ready tools status --json`; `agent-ready tools recommend --json` offers candidate evidence the model weighs against the tool budget. The final output MUST name all three families verbatim — ecosystem, productivity, provider — and either list recommendations with observed evidence and a reason, or state `NO_ADDITIONAL_TOOLS` with a reason; never omit or abbreviate a family, and record the assessment in the output and in the recorded decisions. The model keeps Tool Budget and final recommendation verdicts. An absent tool never blocks a stage; reason from repository signals and degrade gracefully.
