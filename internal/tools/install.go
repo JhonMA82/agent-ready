@@ -39,38 +39,41 @@ func Plan(toolID string) (InstallPlan, error) {
 	if toolID == "" {
 		return InstallPlan{}, errors.New("tool id required")
 	}
-	var recipe *Recipe
+	var entry *Entry
 	for i := range Catalog() {
 		if Catalog()[i].ID == toolID {
-			recipe = &Catalog()[i]
+			entry = &Catalog()[i]
 			break
 		}
 	}
-	if recipe == nil {
+	if entry == nil || entry.Install == nil {
 		return InstallPlan{}, fmt.Errorf("no verified install recipe for %q; recipes exist for: %s", toolID, recipeIDs())
 	}
 	pm := DetectPackageManager()
 	if pm == "" {
 		return InstallPlan{}, errors.New("no supported package manager detected (apt, pacman, dnf, brew)")
 	}
-	op, ok := recipe.Install[pm]
+	op, ok := entry.Install[pm]
 	if !ok {
-		return InstallPlan{}, fmt.Errorf("no verified %s recipe for %q; supported managers: %s", pm, toolID, recipeManagers(*recipe))
+		return InstallPlan{}, fmt.Errorf("no verified %s recipe for %q; supported managers: %s", pm, toolID, recipeManagers(*entry))
 	}
 	return InstallPlan{Tool: toolID, PM: pm, Executable: op.Executable, Args: append([]string{}, op.Args...), Elevation: false, Reason: "verified embedded recipe"}, nil
 }
 
+// recipeIDs lists the recipe-backed catalog entries.
 func recipeIDs() string {
 	ids := make([]string, 0, 8)
-	for _, recipe := range Catalog() {
-		ids = append(ids, recipe.ID)
+	for _, entry := range Catalog() {
+		if entry.Install != nil {
+			ids = append(ids, entry.ID)
+		}
 	}
 	return strings.Join(ids, ", ")
 }
 
-func recipeManagers(recipe Recipe) string {
-	managers := make([]string, 0, len(recipe.Install))
-	for pm := range recipe.Install {
+func recipeManagers(entry Entry) string {
+	managers := make([]string, 0, len(entry.Install))
+	for pm := range entry.Install {
 		managers = append(managers, pm)
 	}
 	return strings.Join(managers, ", ")
@@ -98,11 +101,11 @@ func Install(plan InstallPlan) (InstallResult, error) {
 // presentAfterInstall re-detects the tool; PATH refresh limitations are
 // reported through the fail-closed remediation above.
 func presentAfterInstall(toolID string) (bool, string) {
-	for _, recipe := range Catalog() {
-		if recipe.ID != toolID {
+	for _, entry := range Catalog() {
+		if entry.ID != toolID {
 			continue
 		}
-		return detect(recipe)
+		return detect(entry)
 	}
 	return false, ""
 }
