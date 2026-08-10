@@ -543,6 +543,28 @@ func TestResearchDesignEvolutionContent(t *testing.T) {
 			t.Fatalf("sync-flow missing %q", marker)
 		}
 	}
+
+	// Slice 8 audit-evidence-gates contract: a sync MUST assess whether
+	// changed evidence can affect tool needs; manifest, lockfile, workspace,
+	// wrapper, CI, framework, build/test output, or tool-fact changes MUST
+	// trigger reassessment; irrelevant changes MUST record a reason for
+	// skipping it; a completed reassessment MUST include reasons and either
+	// categorized recommendations or NO_ADDITIONAL_TOOLS.
+	for _, marker := range []string{"tool needs", "reassess", "skip", "reason", "NO_ADDITIONAL_TOOLS"} {
+		if !strings.Contains(evolution, marker) {
+			t.Fatalf("incremental-evolution missing sync-gate marker %q", marker)
+		}
+	}
+	for _, trigger := range []string{"Manifest", "lockfile", "workspace", "wrapper", "CI", "framework", "build/test output", "tool-fact"} {
+		if !strings.Contains(syncFlow, trigger) {
+			t.Fatalf("sync-flow missing reassessment trigger %q", trigger)
+		}
+	}
+	for _, marker := range []string{"categorized recommendations", "NO_ADDITIONAL_TOOLS", "reason for skipping"} {
+		if !strings.Contains(syncFlow, marker) {
+			t.Fatalf("sync-flow missing sync-gate marker %q", marker)
+		}
+	}
 }
 
 // TestFullSuiteFrontmatterAndProgressiveDisclosure locks the full-suite
