@@ -75,6 +75,22 @@ func TestEmbeddedAssetUpgradeGateSlice7(t *testing.T) {
 	})
 }
 
+// TestEmbeddedAssetUpgradeGateSlice8 reruns the Slice 1 parameterized gate
+// over Slice 8's declared changed assets (task 4.3): the two relevant-sync
+// contract files must advance unchanged, preserve modifications, install
+// when absent, and keep protected state intact. As in Slices 1 and 7, the
+// new-marked entry (sync-flow.md) models an older install lacking that path
+// so the gate can prove absent installation and unmanaged collisions for
+// this slice's asset set; the command entry follows the Slice 1 pattern as
+// an owned-path control.
+func TestEmbeddedAssetUpgradeGateSlice8(t *testing.T) {
+	runEmbeddedAssetUpgradeGate(t, "slice-8-driven-sync", []assetUpgrade{
+		{path: ".agent-ready/skills/incremental-evolution/SKILL.md", old: []byte("old evolution skill\n")},
+		{path: ".opencode/commands/agent-ready.md", old: []byte("old sync command\n")},
+		{path: ".agent-ready/skills/incremental-evolution/references/sync-flow.md", new: true},
+	})
+}
+
 func runEmbeddedAssetUpgradeGate(t *testing.T, slice string, changedAssets []assetUpgrade) {
 	t.Helper()
 	t.Run(slice+"/advances-and-installs", func(t *testing.T) {
