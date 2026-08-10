@@ -22,14 +22,16 @@ type Signal struct {
 // Facts contains additive inspect evidence. Empty collections stay omitted so
 // repositories without recognized signals preserve the legacy V1 JSON bytes.
 type Facts struct {
-	Ecosystems       []Ecosystem `json:"ecosystems,omitempty"`
-	Manifests        []Signal    `json:"manifests,omitempty"`
-	Lockfiles        []Signal    `json:"lockfiles,omitempty"`
-	WorkspaceSignals []Signal    `json:"workspace_signals,omitempty"`
-	ProjectWrappers  []Signal    `json:"project_wrappers,omitempty"`
-	FrameworkSignals []Signal    `json:"framework_signals,omitempty"`
-	BuildTools       []Signal    `json:"build_tools,omitempty"`
-	TestTools        []Signal    `json:"test_tools,omitempty"`
+	Ecosystems       []Ecosystem        `json:"ecosystems,omitempty"`
+	Manifests        []Signal           `json:"manifests,omitempty"`
+	Lockfiles        []Signal           `json:"lockfiles,omitempty"`
+	WorkspaceSignals []Signal           `json:"workspace_signals,omitempty"`
+	ProjectWrappers  []Signal           `json:"project_wrappers,omitempty"`
+	FrameworkSignals []Signal           `json:"framework_signals,omitempty"`
+	BuildTools       []Signal           `json:"build_tools,omitempty"`
+	TestTools        []Signal           `json:"test_tools,omitempty"`
+	PackageManagers  []ManagerCandidate `json:"package_managers,omitempty"`
+	ManagerConflicts []ManagerConflict  `json:"manager_conflicts,omitempty"`
 }
 
 type rule struct {
@@ -110,6 +112,7 @@ func Detect(paths []string) Facts {
 		facts.Ecosystems = append(facts.Ecosystems, Ecosystem{ID: id, Evidence: paths})
 	}
 	sort.Slice(facts.Ecosystems, func(i, j int) bool { return facts.Ecosystems[i].ID < facts.Ecosystems[j].ID })
+	facts.PackageManagers, facts.ManagerConflicts = resolveManagers(paths)
 	return facts
 }
 

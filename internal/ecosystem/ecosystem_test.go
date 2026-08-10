@@ -24,6 +24,15 @@ func TestDetectMixedRepositoryFacts(t *testing.T) {
 		ProjectWrappers:  []Signal{{ID: "gradle", Path: "gradlew"}},
 		FrameworkSignals: []Signal{{ID: "nextjs", Path: "next.config.js"}},
 		TestTools:        []Signal{{ID: "vitest", Path: "vitest.config.ts"}},
+		PackageManagers: []ManagerCandidate{
+			{ID: "bun", Confidence: ConfidenceAmbiguous, Evidence: []string{"package.json"}},
+			{ID: "go", Confidence: ConfidenceConfirmed, Evidence: []string{"go.mod", "go.sum"}},
+			{ID: "gradle", Confidence: ConfidenceConfirmed, Evidence: []string{"gradlew"}},
+			{ID: "npm", Confidence: ConfidenceAmbiguous, Evidence: []string{"package.json"}},
+			{ID: "pnpm", Confidence: ConfidenceAmbiguous, Evidence: []string{"package.json"}},
+			{ID: "uv", Confidence: ConfidenceConfirmed, Evidence: []string{"uv.lock"}},
+			{ID: "yarn", Confidence: ConfidenceAmbiguous, Evidence: []string{"package.json"}},
+		},
 	}
 	if got := fmt.Sprint(Detect(paths)); got != fmt.Sprint(want) {
 		t.Fatalf("mixed facts:\ngot  %s\nwant %s", got, fmt.Sprint(want))
