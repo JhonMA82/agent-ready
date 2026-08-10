@@ -149,18 +149,30 @@ func Plan(root, config string) ([]File, error) {
 // reconcile drift). configFile is the installed config owner recorded by the
 // installed manifest. Plan keeps init's strict ownership semantics.
 func Desired(configFile string) ([]File, error) {
-	marker, assets, err := walkAssets()
+	_, assets, err := walkAssets()
 	if err != nil {
 		return nil, err
 	}
 	sort.Slice(assets, func(i, j int) bool { return assets[i].Path < assets[j].Path })
-	desiredManifest, err := canonicalManifest(marker, configFile, assets)
+	desiredManifest, err := Manifest(configFile, assets)
 	if err != nil {
 		return nil, err
 	}
 	assets = append(assets, File{Path: ".agent-ready/manifest.json", After: desiredManifest, Mode: 0o644})
 	sort.Slice(assets, func(i, j int) bool { return assets[i].Path < assets[j].Path })
 	return assets, nil
+}
+
+// Manifest returns canonical ownership evidence for the supplied installed
+// assets. Lifecycle reconciliation uses it to model an older installation.
+func Manifest(configFile string, files []File) ([]byte, error) {
+	marker, _, err := walkAssets()
+	if err != nil {
+		return nil, err
+	}
+	files = append([]File(nil), files...)
+	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
+	return canonicalManifest(marker, configFile, files)
 }
 
 func canonicalManifest(marker []byte, config string, files []File) ([]byte, error) {

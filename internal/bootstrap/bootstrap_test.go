@@ -176,3 +176,21 @@ func TestCanonicalManifestHashesCoverAllAssets(t *testing.T) {
 		}
 	}
 }
+
+func TestManifestCanonicalizesCallerOrder(t *testing.T) {
+	files := []File{
+		{Path: "z", After: []byte("z"), Mode: 0o644},
+		{Path: "a", After: []byte("a"), Mode: 0o600},
+	}
+	first, err := Manifest("opencode.json", files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := Manifest("opencode.json", []File{files[1], files[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(first, second) || files[0].Path != "z" {
+		t.Fatal("manifest must be deterministic without mutating caller order")
+	}
+}

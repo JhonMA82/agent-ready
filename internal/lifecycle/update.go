@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/JhonMA82/agent-ready/internal/bootstrap"
 	"github.com/JhonMA82/agent-ready/internal/safeio"
@@ -47,48 +48,68 @@ func (p Plan) Root() string { return p.root }
 // Changes returns the sorted change set.
 func (p Plan) Changes() []Change { return p.changes }
 
-// UpdatePlan reconciles the installed manifest-owned assets to the binary's
-// embedded assets (drift-tolerant: only owned paths with byte drift change;
-// state/checkpoints and generated artifacts are untouched by construction).
-// Returns a noop plan when everything is already byte-identical.
+type updateManifest struct {
+	Schema               string      `json:"schema"`
+	InstallVersion       string      `json:"install_version"`
+	CompatibilityVersion string      `json:"compatibility_version"`
+	ConfigFile           string      `json:"config_file"`
+	ConfigPath           string      `json:"config_path"`
+	Assets               []AssetInfo `json:"assets"`
+}
+
+// UpdatePlan advances unchanged owned assets to the binary's embedded assets.
+// Modified ownership and unmanaged collisions fail planning without writes;
+// state, checkpoints, generated artifacts, and obsolete ownership stay intact.
 func UpdatePlan(root string) (Plan, error) {
-	schema, _, installed, err := installedManifest(root)
-	if err != nil {
-		return Plan{}, err
-	}
-	if schema == "" {
-		return Plan{}, fmt.Errorf("not initialized: run agent-ready init first")
-	}
-	// The installed manifest records the config owner; re-read it fully.
 	data, err := os.ReadFile(filepath.Join(root, ".agent-ready", "manifest.json"))
 	if err != nil {
+		if os.IsNotExist(err) {
+			return Plan{}, fmt.Errorf("not initialized: run agent-ready init first")
+		}
 		return Plan{}, err
 	}
-	var full struct {
-		ConfigFile string `json:"config_file"`
-	}
-	if err := json.Unmarshal(data, &full); err != nil {
+	var installed updateManifest
+	if err := json.Unmarshal(data, &installed); err != nil {
 		return Plan{}, err
 	}
-	configFile := full.ConfigFile
-
-	desired, err := bootstrap.Desired(configFile)
+	if installed.Schema == "" {
+		return Plan{}, fmt.Errorf("not initialized: run agent-ready init first")
+	}
+	desired, err := bootstrap.Desired(installed.ConfigFile)
 	if err != nil {
 		return Plan{}, err
 	}
-	owned := map[string]bool{}
+	return updatePlan(root, data, installed.Assets, desired)
+}
+
+func updatePlan(root string, manifestBefore []byte, installed []AssetInfo, desired []bootstrap.File) (Plan, error) {
+	owned := make(map[string]AssetInfo, len(installed))
 	for _, asset := range installed {
-		owned[asset.Path] = true
+		owned[asset.Path] = asset
 	}
 	changes := []Change{}
+	conflicts := []string{}
+	desiredPaths := map[string]bool{}
+	var manifestFile bootstrap.File
 	for _, file := range desired {
-		if !owned[file.Path] {
-			// Never touch files outside the installed manifest ownership.
+		if file.Path == ".agent-ready/manifest.json" {
+			manifestFile = file
 			continue
 		}
-		before, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(file.Path)))
+		desiredPaths[file.Path] = true
+		asset, wasOwned := owned[file.Path]
+		full := filepath.Join(root, filepath.FromSlash(file.Path))
+		before, err := os.ReadFile(full)
 		if err != nil && !os.IsNotExist(err) {
 			return Plan{}, err
+		}
+		if wasOwned && !AssetMatches(root, asset) {
+			conflicts = append(conflicts, file.Path+" (modified owned asset)")
+			continue
+		}
+		if !wasOwned && err == nil {
+			conflicts = append(conflicts, file.Path+" (unmanaged collision)")
+			continue
 		}
 		kind := "update"
 		switch {
@@ -99,6 +120,35 @@ func UpdatePlan(root string) (Plan, error) {
 		}
 		changes = append(changes, Change{path: file.Path, kind: kind, before: before, after: bytes.Clone(file.After), mode: file.Mode})
 	}
+	for _, asset := range installed {
+		if !desiredPaths[asset.Path] && !AssetMatches(root, asset) {
+			conflicts = append(conflicts, asset.Path+" (modified obsolete asset)")
+		}
+	}
+	if len(conflicts) > 0 {
+		sort.Strings(conflicts)
+		return Plan{}, fmt.Errorf("ownership conflicts: %s", strings.Join(conflicts, ", "))
+	}
+	var reconciled updateManifest
+	if err := json.Unmarshal(manifestFile.After, &reconciled); err != nil {
+		return Plan{}, err
+	}
+	for _, asset := range installed {
+		if !desiredPaths[asset.Path] {
+			reconciled.Assets = append(reconciled.Assets, asset)
+		}
+	}
+	sort.Slice(reconciled.Assets, func(i, j int) bool { return reconciled.Assets[i].Path < reconciled.Assets[j].Path })
+	manifestAfter, err := json.Marshal(reconciled)
+	if err != nil {
+		return Plan{}, err
+	}
+	manifestAfter = append(manifestAfter, '\n')
+	kind := "update"
+	if bytes.Equal(manifestBefore, manifestAfter) {
+		kind = "noop"
+	}
+	changes = append(changes, Change{path: manifestFile.Path, kind: kind, before: bytes.Clone(manifestBefore), after: manifestAfter, mode: manifestFile.Mode})
 	sort.Slice(changes, func(i, j int) bool { return changes[i].path < changes[j].path })
 	return Plan{root: root, changes: changes}, nil
 }
