@@ -32,17 +32,22 @@ type CI struct {
 	Present bool     `json:"present"`
 	Files   []string `json:"files"`
 }
+type Presence struct {
+	Path string `json:"path"`
+	Kind string `json:"kind"`
+}
 
 // Facts is the agent-ready.inspect/v1 schema; slices and map keys are sorted.
 type Facts struct {
-	SchemaVersion string   `json:"schema_version"`
-	Root          string   `json:"root"`
-	Invocation    string   `json:"invocation,omitempty"`
-	Deps          []Dep    `json:"deps"`
-	Scripts       []Script `json:"scripts"`
-	Workspaces    []string `json:"workspaces"`
-	Files         Files    `json:"files"`
-	CI            CI       `json:"ci"`
+	SchemaVersion string     `json:"schema_version"`
+	Root          string     `json:"root"`
+	Invocation    string     `json:"invocation,omitempty"`
+	Deps          []Dep      `json:"deps"`
+	Scripts       []Script   `json:"scripts"`
+	Workspaces    []string   `json:"workspaces"`
+	Files         Files      `json:"files"`
+	CI            CI         `json:"ci"`
+	Presence      []Presence `json:"presence,omitempty"`
 }
 
 var manifests = []struct {
@@ -55,11 +60,12 @@ var manifests = []struct {
 }
 
 var ciRoot = []string{".gitlab-ci.yml", ".circleci/config.yml", "azure-pipelines.yml", "Jenkinsfile"}
+var heavyTrees = []string{".venv", "bin", "node_modules", "obj", "target", "vendor"}
 
 // Paths returns the sorted relative paths of regular files under root,
 // excluding .git and symlinks (the same walk Inspect reports).
 func Paths(root string) ([]string, error) {
-	paths, _, err := collectFiles(root)
+	paths, _, _, err := collectFiles(root)
 	return paths, err
 }
 
@@ -77,7 +83,7 @@ func Inspect(root, invocation string) (Facts, error) {
 	if err != nil {
 		return Facts{}, err
 	}
-	paths, files, err := collectFiles(root)
+	paths, presence, files, err := collectFiles(root)
 	if err != nil {
 		return Facts{}, err
 	}
@@ -102,15 +108,16 @@ func Inspect(root, invocation string) (Facts, error) {
 	})
 	sort.Slice(scripts, func(i, j int) bool { return scripts[i].Name < scripts[j].Name })
 	sort.Strings(workspaces)
-	facts := Facts{SchemaVersion: SchemaVersion, Root: root, Deps: deps, Scripts: scripts, Workspaces: workspaces, Files: files, CI: findCI(paths)}
+	facts := Facts{SchemaVersion: SchemaVersion, Root: root, Deps: deps, Scripts: scripts, Workspaces: workspaces, Files: files, CI: findCI(paths), Presence: presence}
 	if invocation != "" && invocation != root {
 		facts.Invocation = invocation
 	}
 	return facts, nil
 }
 
-func collectFiles(root string) ([]string, Files, error) {
+func collectFiles(root string) ([]string, []Presence, Files, error) {
 	var paths []string
+	var presence []Presence
 	files := Files{ByExtension: map[string]int{}}
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -118,6 +125,11 @@ func collectFiles(root string) ([]string, Files, error) {
 		}
 		if d.IsDir() {
 			if d.Name() == ".git" {
+				return fs.SkipDir
+			}
+			if path != root && slices.Contains(heavyTrees, d.Name()) {
+				rel, _ := filepath.Rel(root, path)
+				presence = append(presence, Presence{Path: filepath.ToSlash(rel), Kind: "directory"})
 				return fs.SkipDir
 			}
 			return nil
@@ -135,7 +147,8 @@ func collectFiles(root string) ([]string, Files, error) {
 		return nil
 	})
 	sort.Strings(paths)
-	return paths, files, err
+	sort.Slice(presence, func(i, j int) bool { return presence[i].Path < presence[j].Path })
+	return paths, presence, files, err
 }
 
 func findCI(paths []string) CI {
