@@ -234,8 +234,41 @@ func TestSkillCreatorReviewerContent(t *testing.T) {
 	if creator := readAsset(t, "assets/skills/skill-creator/SKILL.md"); !strings.Contains(creator, "Never decide necessity") {
 		t.Fatal("skill-creator must never decide necessity (R4)")
 	}
-	if reviewer := readAsset(t, "assets/skills/skill-reviewer/SKILL.md"); !strings.Contains(reviewer, "mandatory gate") {
+	reviewer := readAsset(t, "assets/skills/skill-reviewer/SKILL.md")
+	if !strings.Contains(reviewer, "mandatory gate") {
 		t.Fatal("skill-reviewer must be the mandatory acceptance gate (R6)")
+	}
+	// Slice 9 audit-evidence-gates contract: the reviewer rejection contract
+	// rejects missing required assessment, unsupported package-manager
+	// certainty, gate-failing framework/toolchain claims, capability claims
+	// exceeding tested support, hidden conflicts, migration decisions
+	// presented as facts, and semantic verdicts routed through Go; NO_ACTION
+	// and Tool Budget remain valid model-owned outcomes. The External
+	// Verification Gate requires current official or versioned evidence tied
+	// to the applicable version, or an explicit reasoned exemption.
+	reviewer = readAsset(t, "assets/skills/skill-reviewer/SKILL.md")
+	for _, marker := range []string{
+		"External Verification Gate", "versioned evidence", "exemption", "repository-to-official",
+		"missing required assessment", "unsupported package-manager certainty",
+		"capability claims exceeding tested support", "hidden conflicts",
+		"migration decisions presented as facts", "semantic verdicts routed through Go",
+		"NO_ACTION", "Tool Budget",
+	} {
+		if !strings.Contains(reviewer, marker) {
+			t.Fatalf("skill-reviewer missing rejection-contract marker %q", marker)
+		}
+	}
+	procedure := readAsset(t, "assets/skills/skill-reviewer/references/review-procedure.md")
+	for _, marker := range []string{
+		"External Verification Gate", "versioned evidence", "exemption", "repository-to-official",
+		"Rejection contract", "missing required assessment", "unsupported package-manager certainty",
+		"capability claims exceeding tested support", "hidden conflicts",
+		"migration decisions presented as facts", "semantic verdicts routed through Go",
+		"NO_ACTION", "Tool Budget", "agent-ready state --json", "agent-ready inspect --json",
+	} {
+		if !strings.Contains(procedure, marker) {
+			t.Fatalf("review-procedure missing rejection-contract marker %q", marker)
+		}
 	}
 	for _, rel := range []string{
 		"skills/skill-creator/references/authoring-procedure.md",
@@ -563,6 +596,34 @@ func TestResearchDesignEvolutionContent(t *testing.T) {
 	for _, marker := range []string{"categorized recommendations", "NO_ADDITIONAL_TOOLS", "reason for skipping"} {
 		if !strings.Contains(syncFlow, marker) {
 			t.Fatalf("sync-flow missing sync-gate marker %q", marker)
+		}
+	}
+
+	// Slice 9 audit-evidence-gates contract: the External Verification Gate
+	// requires current official or versioned evidence tied to the applicable
+	// version (or an explicit reasoned exemption) before version-sensitive
+	// framework, package-manager, or toolchain knowledge is embedded;
+	// repository-to-official research precedence stays intact; artifact
+	// design surfaces conflicts, never states migration as fact, and never
+	// claims certainty beyond tested support.
+	for _, marker := range []string{"External Verification Gate", "versioned evidence", "exemption", "version-sensitive", "repository-to-official research precedence stays intact"} {
+		if !strings.Contains(research, marker) {
+			t.Fatalf("targeted-research missing verification-gate marker %q", marker)
+		}
+	}
+	for _, marker := range []string{"External Verification Gate", "versioned evidence", "exemption", "repository-to-official", "applicable version"} {
+		if !strings.Contains(strategies, marker) {
+			t.Fatalf("search-strategies missing verification-gate marker %q", marker)
+		}
+	}
+	for _, marker := range []string{"Surface conflicts", "migration is proposed", "package-manager certainty", "tested support", "tools status --json"} {
+		if !strings.Contains(design, marker) {
+			t.Fatalf("artifact-design missing verification-gate marker %q", marker)
+		}
+	}
+	for _, marker := range []string{"Hidden conflicts fail review", "Migration is a proposal", "tested support", "tools status --json"} {
+		if !strings.Contains(decisions, marker) {
+			t.Fatalf("artifact-decisions missing verification-gate marker %q", marker)
 		}
 	}
 }

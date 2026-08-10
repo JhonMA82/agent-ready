@@ -11,12 +11,14 @@ Run before a candidate skill is created or accepted, and after every REVISE rewo
 - Never accept a skill without a rubric score, verdict, and per-criterion justification.
 - Never PASS instructions that are not evidence-backed; record blocking concerns in state.
 - Never accept below 85: 70-84 is REVISE, < 70 is REJECT.
+- External Verification Gate: reject framework/toolchain claims that embed version-sensitive knowledge without current official or versioned evidence tied to the applicable version, or without an explicit reasoned exemption; repository-to-official research precedence stays intact.
+- Reject artifacts with missing required assessment, unsupported package-manager certainty, capability claims exceeding tested support, hidden conflicts, migration decisions presented as facts, or semantic verdicts routed through Go. NO_ACTION and Tool Budget remain valid model-owned outcomes.
 
 ## Execution Steps
 1. Load the review procedure reference.
 2. Read the candidate and every reference it names; unresolved references fail validation.
 3. Verify frontmatter: name pattern, directory match, description 1-1024 chars.
-4. Trace evidence grounding; scan the anti-pattern catalog.
+4. Trace evidence grounding; apply the External Verification Gate to version-sensitive claims; scan the anti-pattern catalog.
 5. Score each rubric criterion; write the score sheet.
 6. Return PASS, REVISE, or REJECT; record the sheet in state.
 
