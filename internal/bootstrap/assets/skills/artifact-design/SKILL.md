@@ -12,6 +12,8 @@ Run when the loop reaches the artifact_decisions stage or when new evidence chan
 - NO_ACTION is a first-class decision: nothing scoring below threshold means nothing is created.
 - No artifact spam: prefer REUSE over CREATE, keep the artifact set minimal, and record avoided artifacts.
 - Never propose an artifact on UNKNOWN-only evidence; gather more or stop with ASK_USER.
+- Surface conflicts, never hide them: conflicting package-manager or ecosystem evidence is named with the decision, and migration is proposed, never stated as fact.
+- No unsupported certainty: package-manager certainty and capability claims never exceed the tested support in `tools status --json`.
 - Record every decision with its evidence and confidence in state (decisions.jsonl).
 
 ## Execution Steps

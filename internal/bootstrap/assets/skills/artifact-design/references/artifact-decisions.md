@@ -20,4 +20,7 @@ The six decision verbs of the audit loop. Read this reference when a decision po
 - UNKNOWN-only evidence never decides CREATE; it decides gather-more or ASK_USER.
 - NO_ACTION is success: a repo that needs no new skills produces no artifacts.
 - "N skills generated" is never accepted as evidence of progress (R11).
+- Hidden conflicts fail review: conflicting package-manager or ecosystem evidence is surfaced with the decision, never silently resolved.
+- Migration is a proposal, not a fact: a migration decision requires evidence and approval; presenting it as a fact fails review.
+- Certainty is bounded by tested support: package-manager certainty and capability claims never exceed `tools status --json` support states.
 - Every decision is recorded in state (decisions.jsonl) with its evidence and confidence.
