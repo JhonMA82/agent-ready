@@ -408,6 +408,35 @@ func TestOrchestratorAnalysisContent(t *testing.T) {
 			t.Fatalf("inventory-facts missing source %q", source)
 		}
 	}
+
+	// Slice 7 audit-evidence-gates contract: every successful initial audit
+	// mandates a categorized Tool / Capability Assessment (ecosystem,
+	// productivity, provider) with reasons, or reasoned NO_ADDITIONAL_TOOLS;
+	// the "tool management is out of scope" rule is replaced by mandatory
+	// assessment/evaluation.
+	for _, marker := range []string{"Tool / Capability Assessment", "ecosystem", "productivity", "provider", "reason"} {
+		if !strings.Contains(orch, marker) {
+			t.Fatalf("orchestrator missing audit-gate marker %q", marker)
+		}
+	}
+	if strings.Contains(orch, "tool management is out of scope") {
+		t.Fatal("orchestrator must not defer tool assessment as out of scope")
+	}
+	for _, marker := range []string{"ecosystem", "productivity", "provider", "NO_ADDITIONAL_TOOLS", "reason"} {
+		if !strings.Contains(auditFlow, marker) {
+			t.Fatalf("audit-flow missing audit-gate marker %q", marker)
+		}
+	}
+	for _, marker := range []string{"Tool / Capability Assessment", "tools status", "reason"} {
+		if !strings.Contains(analysis, marker) {
+			t.Fatalf("repository-analysis missing audit-gate marker %q", marker)
+		}
+	}
+	for _, marker := range []string{"tools status", "tools recommend", "NO_ADDITIONAL_TOOLS"} {
+		if !strings.Contains(inventory, marker) {
+			t.Fatalf("inventory-facts missing audit-gate marker %q", marker)
+		}
+	}
 }
 
 // TestResearchDesignEvolutionContent locks the PR5 skill trio (R1, R11):

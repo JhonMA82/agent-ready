@@ -11,6 +11,8 @@ How to gather the deterministic evidence base. Read this reference when explorat
 | state | Read-only facts over decisions.jsonl, provenance.jsonl, artifact-graph.yaml, repository-profile.yaml | Resume and reuse |
 | changes | Changed paths since the checkpoint baseline | Resume and selective sync |
 | checkpoint status | Current stage and completeness | Every run start |
+| tools status | Tool/capability facts by family (ecosystem, productivity, provider) | Tool / Capability Assessment |
+| tools recommend | Candidate evidence with capability truth and reasons | Tool / Capability Assessment |
 
 ## Gathering rules
 
@@ -18,3 +20,4 @@ How to gather the deterministic evidence base. Read this reference when explorat
 - Gather only what the current stage needs; stop when the decision is supported.
 - Record each fact with its source; helper output is identified by its schema name.
 - Never read whole files into context; extract the fact and label it.
+- Feed every successful audit's Tool / Capability Assessment: all three families with evidence and reasons, or `NO_ADDITIONAL_TOOLS` with a reason.
