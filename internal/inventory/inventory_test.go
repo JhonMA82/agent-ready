@@ -204,3 +204,41 @@ func TestInspectAttachesEcosystemFactsFromBoundedPaths(t *testing.T) {
 		}
 	}
 }
+
+func TestOutputSignals(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "main.go", "package main\n")
+	dirs := []string{
+		".dart_tool", ".next", ".nuxt", ".venv", "__pycache__", "_build", "bin",
+		"build", "cmake-build-debug", "coverage", "deps", "dist", "node_modules",
+		"obj", "out", "result", "storage/logs", "target", "vendor", "venv",
+	}
+	for _, dir := range dirs {
+		write(t, root, dir+"/nested/ignored.txt", "ignored\n")
+	}
+
+	first, err := Inspect(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make([]string, len(first.OutputSignals))
+	for i, sig := range first.OutputSignals {
+		got[i] = sig.Path
+	}
+	if fmt.Sprint(got) != fmt.Sprint(dirs) {
+		t.Fatalf("output signals:\ngot  %v\nwant %v", got, dirs)
+	}
+	second, err := Inspect(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, _ := json.Marshal(first)
+	if b, _ := json.Marshal(second); string(a) != string(b) {
+		t.Fatalf("output signals not byte-stable:\n%s\n%s", a, b)
+	}
+	for _, forbidden := range []string{"primary", "preferred", "recommend", "verdict"} {
+		if strings.Contains(string(a), forbidden) {
+			t.Fatalf("output signals contain decision %q: %s", forbidden, a)
+		}
+	}
+}

@@ -51,6 +51,7 @@ type Facts struct {
 	CI            CI         `json:"ci"`
 	Presence      []Presence `json:"presence,omitempty"`
 	ecosystem.Facts
+	OutputSignals []ecosystem.Signal `json:"output_signals,omitempty"`
 }
 
 var manifests = []struct {
@@ -65,10 +66,30 @@ var manifests = []struct {
 var ciRoot = []string{".gitlab-ci.yml", ".circleci/config.yml", "azure-pipelines.yml", "Jenkinsfile"}
 var heavyTrees = []string{".venv", "bin", "node_modules", "obj", "target", "vendor"}
 
+// outputSignalDirs: §9 output/build dirs as presence signals (cmake-build-*
+// prefix, nested storage/logs); candidate-only, no verdict.
+var outputSignalDirs = []string{
+	".dart_tool", ".next", ".nuxt", ".venv", "__pycache__", "_build", "bin",
+	"build", "coverage", "deps", "dist", "node_modules", "obj", "out",
+	"result", "storage/logs", "target", "vendor", "venv",
+}
+
+func outputSignalID(rel, name string) string {
+	if strings.HasPrefix(name, "cmake-build-") {
+		return name
+	}
+	for _, dir := range outputSignalDirs {
+		if name == dir || rel == dir || strings.HasSuffix(rel, "/"+dir) {
+			return dir
+		}
+	}
+	return ""
+}
+
 // Paths returns the sorted relative paths of regular files under root,
 // excluding .git and symlinks (the same walk Inspect reports).
 func Paths(root string) ([]string, error) {
-	paths, _, _, err := collectFiles(root)
+	paths, _, _, _, err := collectFiles(root)
 	return paths, err
 }
 
@@ -86,7 +107,7 @@ func Inspect(root, invocation string) (Facts, error) {
 	if err != nil {
 		return Facts{}, err
 	}
-	paths, presence, files, err := collectFiles(root)
+	paths, presence, outputSignals, files, err := collectFiles(root)
 	if err != nil {
 		return Facts{}, err
 	}
@@ -111,16 +132,17 @@ func Inspect(root, invocation string) (Facts, error) {
 	})
 	sort.Slice(scripts, func(i, j int) bool { return scripts[i].Name < scripts[j].Name })
 	sort.Strings(workspaces)
-	facts := Facts{SchemaVersion: SchemaVersion, Root: root, Deps: deps, Scripts: scripts, Workspaces: workspaces, Files: files, CI: findCI(paths), Presence: presence, Facts: ecosystem.Detect(paths)}
+	facts := Facts{SchemaVersion: SchemaVersion, Root: root, Deps: deps, Scripts: scripts, Workspaces: workspaces, Files: files, CI: findCI(paths), Presence: presence, OutputSignals: outputSignals, Facts: ecosystem.Detect(root, paths)}
 	if invocation != "" && invocation != root {
 		facts.Invocation = invocation
 	}
 	return facts, nil
 }
 
-func collectFiles(root string) ([]string, []Presence, Files, error) {
+func collectFiles(root string) ([]string, []Presence, []ecosystem.Signal, Files, error) {
 	var paths []string
 	var presence []Presence
+	var outputSignals []ecosystem.Signal
 	files := Files{ByExtension: map[string]int{}}
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -130,10 +152,16 @@ func collectFiles(root string) ([]string, []Presence, Files, error) {
 			if d.Name() == ".git" {
 				return fs.SkipDir
 			}
-			if path != root && slices.Contains(heavyTrees, d.Name()) {
+			if path != root {
 				rel, _ := filepath.Rel(root, path)
-				presence = append(presence, Presence{Path: filepath.ToSlash(rel), Kind: "directory"})
-				return fs.SkipDir
+				rel = filepath.ToSlash(rel)
+				if id := outputSignalID(rel, d.Name()); id != "" {
+					outputSignals = append(outputSignals, ecosystem.Signal{id, rel})
+				}
+				if slices.Contains(heavyTrees, d.Name()) {
+					presence = append(presence, Presence{rel, "directory"})
+					return fs.SkipDir
+				}
 			}
 			return nil
 		}
@@ -151,7 +179,10 @@ func collectFiles(root string) ([]string, []Presence, Files, error) {
 	})
 	sort.Strings(paths)
 	sort.Slice(presence, func(i, j int) bool { return presence[i].Path < presence[j].Path })
-	return paths, presence, files, err
+	sort.Slice(outputSignals, func(i, j int) bool {
+		return outputSignals[i].ID < outputSignals[j].ID || outputSignals[i].ID == outputSignals[j].ID && outputSignals[i].Path < outputSignals[j].Path
+	})
+	return paths, presence, outputSignals, files, err
 }
 
 func findCI(paths []string) CI {
