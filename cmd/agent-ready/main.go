@@ -138,7 +138,16 @@ func main() {
 		if !approved {
 			return plan, errors.New("installation cancelled; nothing was executed")
 		}
-		return tools.Install(plan)
+		result, err := tools.Install(plan)
+		if err != nil {
+			return nil, err
+		}
+		// D6/§47: separate post-install global-integration opt-in, default N.
+		// Only install can prompt — init never runs this path.
+		if err := tools.GlobalIntegrationPrompt(os.Stdout, os.Stdin, plan.Tool); err != nil {
+			return nil, err
+		}
+		return result, nil
 	}}
 	toolsCmd := cli.Helper{Name: "tools", Subs: []cli.Helper{toolsStatus, toolsDoctor, toolsRecommend, toolsInstall, toolsExplain}}
 	status := cli.Helper{Name: "status", Run: withRoot(func(root string) (any, error) { return lifecycle.Status(root) })}

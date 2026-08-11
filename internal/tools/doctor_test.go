@@ -50,9 +50,17 @@ func TestDoctorTiers(t *testing.T) {
 func TestDoctorHealthyWithWarnings(t *testing.T) {
 	root := t.TempDir()
 	fakeGit(t, root)
-	// CI has no opencode on PATH; inject a fake so the required tier passes.
+	// §49 provider checks probe real provider binaries, so isolate PATH to
+	// the fake opencode plus git's own directory (host-sensitive otherwise).
+	if runtime.GOOS == "windows" {
+		t.Skip("fake PATH is Unix-only")
+	}
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
 	bin := fakeBin(t, "opencode", "1.18.15")
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+filepath.Dir(gitPath))
 	facts, err := Doctor(root)
 	if err != nil {
 		t.Fatal(err)
@@ -74,7 +82,8 @@ func TestRecommendSignals(t *testing.T) {
 	if len(facts.Candidates) != 0 {
 		t.Fatalf("trivial repo must have no candidates: %+v", facts.Candidates)
 	}
-	// Lockfile + output dir -> Context7 + RTK.
+	// Output dir -> RTK + Headroom (D4: RTK evidence + output-pressure
+	// signals coexist); lockfile-only Context7 stays absent (D3).
 	if err := os.WriteFile(filepath.Join(root, "go.sum"), []byte("checksum\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -92,10 +101,63 @@ func TestRecommendSignals(t *testing.T) {
 			t.Fatalf("candidate missing fields: %+v", candidate)
 		}
 	}
-	if !got["Context7"] || !got["RTK"] {
-		t.Fatalf("expected Context7+RTK candidates, got %+v", got)
+	if !got["RTK"] || !got["Headroom"] || got["Context7"] {
+		t.Fatalf("expected RTK+Headroom without Context7, got %+v", got)
 	}
 	if facts.Summary() == "No capability candidates" {
 		t.Fatalf("summary: %s", facts.Summary())
+	}
+}
+
+// §49: per-provider doctor checks. A provider is never reported healthy
+// merely because a binary exists: a broken version and a missing project
+// index are failures carrying a reason; absence is a warning (providers are
+// never auto-installed).
+func TestProviderDoctorChecks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake executables are Unix-only")
+	}
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	gitDir := filepath.Dir(gitPath)
+	root := t.TempDir()
+	fakeGit(t, root)
+	withIndex := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(withIndex, ".codegraph"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pathFor := func(bins ...string) string {
+		return strings.Join(append(bins, gitDir), string(os.PathListSeparator))
+	}
+	healthy := fakeBin(t, "opencode", "1.18.15") + string(os.PathListSeparator) + fakeBin(t, "codegraph", "codegraph 1.5.0")
+	broken := fakeBin(t, "opencode", "1.18.15") + string(os.PathListSeparator) + fakeBin(t, "codegraph", "garbage without version")
+	for _, tc := range []struct {
+		name, path, repo, wantStatus, wantDetail string
+		wantHealthy                              bool
+	}{
+		{name: "healthy provider", path: pathFor(healthy), repo: withIndex, wantStatus: "ok", wantHealthy: true},
+		{name: "broken version", path: pathFor(broken), repo: withIndex, wantStatus: "fail", wantDetail: "version does not parse"},
+		{name: "missing project index", path: pathFor(healthy), repo: root, wantStatus: "fail", wantDetail: ".codegraph/"},
+		{name: "absent provider", path: pathFor(fakeBin(t, "opencode", "1.18.15")), repo: root, wantStatus: "warning", wantDetail: "never auto-installed", wantHealthy: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("PATH", tc.path)
+			facts, err := Doctor(tc.repo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if facts.Healthy != tc.wantHealthy {
+				t.Fatalf("healthy=%v, want %v: %+v", facts.Healthy, tc.wantHealthy, facts.Checks)
+			}
+			for _, check := range facts.Checks {
+				if check.Name == "provider:codegraph" {
+					if check.Status != tc.wantStatus || tc.wantDetail != "" && !strings.Contains(check.Detail, tc.wantDetail) {
+						t.Fatalf("provider:codegraph: %+v", check)
+					}
+				}
+			}
+		})
 	}
 }

@@ -86,9 +86,24 @@ type Capabilities struct {
 	SideEffects CapabilityState `json:"side_effects"`
 }
 
+// ProviderMetadata is the §48 metadata-first declaration carried by provider
+// entries: install method, project-init requirement, OpenCode integration
+// mode, global/local side effects, uninstall, and health check. Anything
+// without a verified recipe stays declared unsupported (honesty invariant:
+// install: supported ⟺ verified).
+type ProviderMetadata struct {
+	InstallMethod   string `json:"install_method,omitempty"`
+	ProjectInit     string `json:"project_init,omitempty"`
+	IntegrationMode string `json:"integration_mode,omitempty"`
+	SideEffects     string `json:"side_effects,omitempty"`
+	Uninstall       string `json:"uninstall,omitempty"`
+	Health          string `json:"health,omitempty"`
+}
+
 // Entry is one catalog entry: stable identifier, family, detection metadata,
 // the verified install recipe when one exists, the seven capability states,
-// and §20 additive safety metadata (level, methods, side effects, integration).
+// §20 additive safety metadata (level, methods, side effects, integration),
+// and the §14 provider declarations (capability ids + §48 metadata).
 type Entry struct {
 	ID              string
 	Family          Family
@@ -100,19 +115,23 @@ type Entry struct {
 	Methods         []string
 	SideEffects     string
 	IntegrationMode string
+	CapabilityIDs   []string
+	Provider        *ProviderMetadata
 }
 
 // entrySpec is the authored capability-truth row; recipe-backed entries
 // inherit executables/version/install from their embedded recipe JSON.
 type entrySpec struct {
-	id          string
-	family      Family
-	caps        Capabilities
-	executables []string
-	versionArgs []string
-	level       SafetyLevel
-	sideEffects string
-	integration string
+	id            string
+	family        Family
+	caps          Capabilities
+	executables   []string
+	versionArgs   []string
+	level         SafetyLevel
+	sideEffects   string
+	integration   string
+	capabilityIDs []string
+	provider      *ProviderMetadata
 }
 
 // support is the single capability-truth table, sorted by stable identifier.
@@ -124,16 +143,17 @@ var support = []entrySpec{
 	{id: "bundle", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"bundle"}, versionArgs: []string{"--version"}},
 	{id: "cargo", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"cargo"}, versionArgs: []string{"--version"}},
 	{id: "cmake", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"cmake"}, versionArgs: []string{"--version"}},
-	{id: "codegraph", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported)},
+	{id: "codegraph", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), capabilityIDs: []string{"dependency_graph", "call_graph", "blast_radius", "architecture_query"}, provider: providerMeta("unsupported (no verified V1 recipe)", "required: project index (.codegraph/)", "none (local index only)", "executable + version + project index")},
 	{id: "composer", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported), level: SafetyVersionSensitive},
 	{id: "conan", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"conan"}, versionArgs: []string{"--version"}},
-	{id: "context7", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported)},
+	{id: "context7", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), capabilityIDs: []string{"versioned_documentation"}, provider: providerMeta("unsupported (no verified V1 recipe)", "none", "none (client-side queries only)", "executable + version")},
 	{id: "dart", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"dart"}, versionArgs: []string{"--version"}},
 	{id: "deno", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"deno"}, versionArgs: []string{"--version"}},
 	{id: "dotnet", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"dotnet"}, versionArgs: []string{"--version"}},
 	{id: "fd", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported), level: SafetySafeRecipe},
 	{id: "flutter", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"flutter"}, versionArgs: []string{"--version"}},
 	{id: "gh", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported), level: SafetySafeRecipe},
+	{id: "headroom", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), capabilityIDs: []string{"general_context_compression"}, provider: providerMeta("unsupported (no verified V1 recipe)", "none", "none (client-side queries only)", "executable + version")},
 	{id: "go", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"go"}, versionArgs: []string{"version"}},
 	{id: "gradle", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"gradle"}, versionArgs: []string{"--version"}, level: SafetyProjectWrapperPreferred},
 	{id: "jq", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported), level: SafetySafeRecipe},
@@ -150,7 +170,8 @@ var support = []entrySpec{
 	{id: "rg", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported), level: SafetySafeRecipe},
 	{id: "rtk", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported), level: SafetySafeRecipe, sideEffects: "GLOBAL_SIDE_EFFECT", integration: "opt-in"},
 	{id: "rustup", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"rustup"}, versionArgs: []string{"--version"}, level: SafetyVersionSensitive},
-	{id: "semble", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported)},
+	{id: "semble", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), capabilityIDs: []string{"semantic_retrieval"}, provider: providerMeta("unsupported (no verified V1 recipe)", "none", "none (client-side queries only)", "executable + version")},
+	{id: "serena", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), capabilityIDs: []string{"symbol_intelligence", "semantic_navigation", "symbolic_editing"}, provider: providerMeta("unsupported (no verified V1 recipe)", "none", "none (client-side queries only)", "executable + version")},
 	{id: "terraform", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"terraform"}, versionArgs: []string{"version"}},
 	{id: "tofu", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"tofu"}, versionArgs: []string{"version"}},
 	{id: "uv", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported), level: SafetySafeRecipe},
@@ -160,6 +181,21 @@ var support = []entrySpec{
 // caps is the positional seven-state constructor in Capabilities field order.
 func caps(detect, version, recommend, install, configure, integration, sideEffects CapabilityState) Capabilities {
 	return Capabilities{Detect: detect, Version: version, Recommend: recommend, Install: install, Configure: configure, Integration: integration, SideEffects: sideEffects}
+}
+
+// providerMeta builds the §48 metadata declaration for a provider entry.
+// Nothing is invented: fields without a verified implementation declare
+// unsupported; uninstall stays not-applicable because providers are never
+// auto-installed.
+func providerMeta(install, init, effects, health string) *ProviderMetadata {
+	return &ProviderMetadata{
+		InstallMethod:   install,
+		ProjectInit:     init,
+		IntegrationMode: "none (unsupported in V1)",
+		SideEffects:     effects,
+		Uninstall:       "not applicable (never auto-installed)",
+		Health:          health,
+	}
 }
 
 // Catalog returns the single support-truth catalog: every entry with its
@@ -192,6 +228,8 @@ func Catalog() []Entry {
 		entry.SafetyLevel = spec.level
 		entry.SideEffects = spec.sideEffects
 		entry.IntegrationMode = spec.integration
+		entry.CapabilityIDs = spec.capabilityIDs
+		entry.Provider = spec.provider
 		entries = append(entries, entry)
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].ID < entries[j].ID })

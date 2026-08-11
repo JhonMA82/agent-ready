@@ -35,16 +35,18 @@ type ToolFamily struct {
 }
 
 // FamilyTool is one tool's presence evidence, capability truth, and §20
-// additive safety metadata (optional, never required).
+// additive safety metadata (optional, never required); providers additionally
+// carry their §48 metadata declaration.
 type FamilyTool struct {
-	ID              string       `json:"id"`
-	Present         bool         `json:"present"`
-	Version         string       `json:"version,omitempty"`
-	Capabilities    Capabilities `json:"capabilities"`
-	SafetyLevel     SafetyLevel  `json:"safety_level,omitempty"`
-	Methods         []string     `json:"methods,omitempty"`
-	SideEffects     string       `json:"side_effects,omitempty"`
-	IntegrationMode string       `json:"integration_mode,omitempty"`
+	ID              string            `json:"id"`
+	Present         bool              `json:"present"`
+	Version         string            `json:"version,omitempty"`
+	Capabilities    Capabilities      `json:"capabilities"`
+	SafetyLevel     SafetyLevel       `json:"safety_level,omitempty"`
+	Methods         []string          `json:"methods,omitempty"`
+	SideEffects     string            `json:"side_effects,omitempty"`
+	IntegrationMode string            `json:"integration_mode,omitempty"`
+	Provider        *ProviderMetadata `json:"provider,omitempty"`
 }
 
 // SchemaVersion is the agent-ready.tools/v1 schema.
@@ -99,7 +101,7 @@ func Status() (Facts, error) {
 		byFamily[entry.Family] = append(byFamily[entry.Family], FamilyTool{
 			ID: entry.ID, Present: present, Version: version, Capabilities: entry.Capabilities,
 			SafetyLevel: entry.SafetyLevel, Methods: entry.Methods, SideEffects: entry.SideEffects,
-			IntegrationMode: entry.IntegrationMode,
+			IntegrationMode: entry.IntegrationMode, Provider: entry.Provider,
 		})
 	}
 	for _, family := range []Family{FamilyEcosystem, FamilyProductivity, FamilyProvider} {
