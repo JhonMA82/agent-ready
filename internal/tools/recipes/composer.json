@@ -1,0 +1,1 @@
+{"id":"composer","executables":["composer"],"version_args":["--version"],"install":{"apt":{"executable":"apt","args":["install","-y","composer"]},"pacman":{"executable":"pacman","args":["-S","--needed","composer"]},"dnf":{"executable":"dnf","args":["install","-y","composer"]},"brew":{"executable":"brew","args":["install","composer"]}}}

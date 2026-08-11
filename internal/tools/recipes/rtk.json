@@ -1,0 +1,1 @@
+{"id":"rtk","executables":["rtk"],"version_args":["--version"],"install":{"brew":{"executable":"brew","args":["install","rtk"]}}}

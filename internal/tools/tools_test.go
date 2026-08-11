@@ -14,10 +14,10 @@ func TestEmbeddedRecipesUnchanged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(recipes) != 5 {
-		t.Fatalf("expected 5 recipes, got %d: %v", len(recipes), recipeIDs())
+	if len(recipes) != 8 {
+		t.Fatalf("expected 8 recipes, got %d: %v", len(recipes), recipeIDs())
 	}
-	want := []string{"ast-grep", "fd", "gh", "jq", "rg"}
+	want := []string{"ast-grep", "composer", "fd", "gh", "jq", "rg", "rtk", "uv"}
 	for i, recipe := range recipes {
 		if recipe.ID != want[i] {
 			t.Fatalf("sorted recipes: got %s at %d, want %s", recipe.ID, i, want[i])
@@ -30,8 +30,8 @@ func TestEmbeddedRecipesUnchanged(t *testing.T) {
 
 func TestCatalogOrderedSupportTruth(t *testing.T) {
 	catalog := Catalog()
-	if len(catalog) != 17 {
-		t.Fatalf("expected 17 catalog entries, got %d", len(catalog))
+	if len(catalog) != 36 {
+		t.Fatalf("expected 36 catalog entries, got %d", len(catalog))
 	}
 	for i := 1; i < len(catalog); i++ {
 		if catalog[i-1].ID >= catalog[i].ID {
@@ -45,6 +45,9 @@ func TestCatalogOrderedSupportTruth(t *testing.T) {
 		}
 		if entry.Capabilities.Detect == Supported && len(entry.Executables) == 0 {
 			t.Fatalf("%s claims detect support without executables", entry.ID)
+		}
+		if entry.Capabilities.Detect == Supported && len(entry.VersionArgs) == 0 {
+			t.Fatalf("%s claims detect support without versionArgs", entry.ID)
 		}
 		// §20: every entry with install support declares a safety level.
 		if hasRecipe && entry.SafetyLevel == "" {
@@ -111,7 +114,7 @@ func TestExplain(t *testing.T) {
 	if facts.SchemaVersion != ExplainSchemaVersion || facts.ID != "uv" || facts.Kind != "ecosystem" {
 		t.Fatalf("explain facts: %+v", facts)
 	}
-	if facts.SafetyLevel != SafetySafeRecipe || facts.Capabilities.Detect != Supported || facts.Capabilities.Install != Unsupported {
+	if facts.SafetyLevel != SafetySafeRecipe || facts.Capabilities.Detect != Supported || facts.Capabilities.Install != Supported || strings.Join(facts.Methods, ",") != "apt,brew,dnf,pacman" {
 		t.Fatalf("uv declared facts: %+v", facts)
 	}
 	if s := facts.Summary(); !strings.Contains(s, "safety_level=SAFE_RECIPE") || !strings.Contains(s, "detect=supported") {
@@ -205,8 +208,9 @@ func TestDetectEcosystemTools(t *testing.T) {
 	t.Setenv("PATH", fakeBins(t, map[string]string{
 		"go":   "go version go1.24.1 linux/amd64",
 		"node": "v22.11.0",
+		"rtk":  "rtk 0.28.2",
 	}))
-	for id, want := range map[string]string{"go": "go version go1.24.1 linux/amd64", "node": "v22.11.0"} {
+	for id, want := range map[string]string{"go": "go version go1.24.1 linux/amd64", "node": "v22.11.0", "rtk": "rtk 0.28.2"} {
 		entry := entryByID(t, id)
 		present, version := detect(entry)
 		if !present || !strings.Contains(version, want) {
@@ -214,7 +218,7 @@ func TestDetectEcosystemTools(t *testing.T) {
 		}
 	}
 	// Provider entries have no executable contract: never present.
-	for _, id := range []string{"codegraph", "context7", "rtk", "semble"} {
+	for _, id := range []string{"codegraph", "context7", "semble"} {
 		entry := entryByID(t, id)
 		if present, _ := detect(entry); present {
 			t.Fatalf("provider %s must never be detected", id)
@@ -262,6 +266,7 @@ func TestStatusFamiliesOrderedAndStable(t *testing.T) {
 		"jq":       "jq-1.7.1",
 		"node":     "v22.11.0",
 		"rg":       "ripgrep 14.1.0",
+		"rtk":      "rtk 0.28.2",
 	}))
 	first, err := Status()
 	if err != nil {
@@ -274,7 +279,11 @@ func TestStatusFamiliesOrderedAndStable(t *testing.T) {
 	// Golden shape: fixed-order families with ID-sorted tools, presence
 	// evidence, and all seven capability states.
 	order := []Family{FamilyEcosystem, FamilyProductivity, FamilyProvider}
-	want := [][]string{{"composer", "gh", "go", "gradle", "maven", "node", "pip", "rustup", "uv"}, {"ast-grep", "fd", "jq", "rg"}, {"codegraph", "context7", "rtk", "semble"}}
+	want := [][]string{
+		{"bun", "bundle", "cargo", "cmake", "composer", "conan", "dart", "deno", "dotnet", "flutter", "gh", "go", "gradle", "maven", "mix", "nix", "node", "npm", "pdm", "pip", "pipenv", "pnpm", "poetry", "rustup", "terraform", "tofu", "uv", "yarn"},
+		{"ast-grep", "fd", "jq", "rg", "rtk"},
+		{"codegraph", "context7", "semble"},
+	}
 	if len(first.Families) != 3 {
 		t.Fatalf("expected 3 families, got %d", len(first.Families))
 	}
@@ -291,25 +300,37 @@ func TestStatusFamiliesOrderedAndStable(t *testing.T) {
 	eco, prod, prov := first.Families[0].Tools, first.Families[1].Tools, first.Families[2].Tools
 	// Detect-only ecosystem tools carry presence evidence yet stay
 	// uninstallable; providers never present and carry no lifecycle support.
-	if goTool := eco[2]; !goTool.Present || !strings.Contains(goTool.Version, "go version go1.24.1") || goTool.Capabilities.Install != Unsupported {
+	if goTool := familyToolByID(t, eco, "go"); !goTool.Present || !strings.Contains(goTool.Version, "go version go1.24.1") || goTool.Capabilities.Install != Unsupported {
 		t.Fatalf("go truth: %+v", goTool)
 	}
+	// §45: npm/cargo/terraform style entries surface detect+version only.
+	for _, id := range []string{"npm", "cargo", "terraform"} {
+		entry := familyToolByID(t, eco, id)
+		if entry.Capabilities.Detect != Supported || entry.Capabilities.Version != Supported || entry.Capabilities.Install != Unsupported {
+			t.Fatalf("%s must be detect-only: %+v", id, entry)
+		}
+	}
 	// §20 levels surface in status --json with recipe methods.
-	if rgTool := prod[3]; rgTool.Capabilities.Install != Supported || rgTool.SafetyLevel != SafetySafeRecipe || strings.Join(rgTool.Methods, ",") != "apt,dnf,pacman" {
+	if rgTool := familyToolByID(t, prod, "rg"); rgTool.Capabilities.Install != Supported || rgTool.SafetyLevel != SafetySafeRecipe || strings.Join(rgTool.Methods, ",") != "apt,dnf,pacman" {
 		t.Fatalf("rg truth: %+v", rgTool)
 	}
 	if !strings.Contains(string(data), `"safety_level":"SAFE_RECIPE"`) {
 		t.Fatalf("status JSON must surface the safety level: %s", data)
 	}
-	// Declared detect-only entries carry their level too.
-	if uvTool := eco[8]; uvTool.SafetyLevel != SafetySafeRecipe || uvTool.Capabilities.Install != Unsupported {
+	// Declared detect-only entries carry their level too; uv is now
+	// recipe-backed with SAFE_RECIPE and install support.
+	if uvTool := familyToolByID(t, eco, "uv"); uvTool.SafetyLevel != SafetySafeRecipe || uvTool.Capabilities.Install != Supported {
 		t.Fatalf("uv safety metadata: %+v", uvTool)
 	}
+	// Composer keeps VERSION_SENSITIVE with its deterministic recipe.
+	if composerTool := familyToolByID(t, eco, "composer"); composerTool.SafetyLevel != SafetyVersionSensitive || composerTool.Capabilities.Install != Supported {
+		t.Fatalf("composer safety metadata: %+v", composerTool)
+	}
 	// RTK splits binary-install safety from its separate global side effect.
-	if rtkTool := prov[2]; rtkTool.SafetyLevel != SafetySafeRecipe || rtkTool.SideEffects != "GLOBAL_SIDE_EFFECT" || rtkTool.IntegrationMode != "opt-in" {
+	if rtkTool := familyToolByID(t, prod, "rtk"); rtkTool.SafetyLevel != SafetySafeRecipe || rtkTool.SideEffects != "GLOBAL_SIDE_EFFECT" || rtkTool.IntegrationMode != "opt-in" {
 		t.Fatalf("rtk split metadata: %+v", rtkTool)
 	}
-	for _, tool := range first.Families[2].Tools {
+	for _, tool := range prov {
 		if tool.Present || tool.Capabilities.Install != Unsupported || tool.Capabilities.Configure != Unsupported || tool.Capabilities.Integration != Unsupported || tool.Capabilities.SideEffects != Unsupported {
 			t.Fatalf("provider truth: %+v", tool)
 		}
@@ -323,6 +344,17 @@ func TestStatusFamiliesOrderedAndStable(t *testing.T) {
 	if string(data) != string(b) {
 		t.Fatal("status JSON must be byte-stable")
 	}
+}
+
+func familyToolByID(t *testing.T, tools []FamilyTool, id string) FamilyTool {
+	t.Helper()
+	for _, tool := range tools {
+		if tool.ID == id {
+			return tool
+		}
+	}
+	t.Fatalf("family tool %q not found", id)
+	return FamilyTool{}
 }
 
 func TestV1ReaderCompatibility(t *testing.T) {
@@ -353,8 +385,8 @@ func TestV1ReaderCompatibility(t *testing.T) {
 	if v1.SchemaVersion != SchemaVersion || v1.OS == "" {
 		t.Fatalf("V1 header lost: %+v", v1)
 	}
-	if len(v1.Tools) != 5 {
-		t.Fatalf("V1 tools map must stay recipe-keyed (5), got %d", len(v1.Tools))
+	if len(v1.Tools) != 8 {
+		t.Fatalf("V1 tools map must stay recipe-keyed (8), got %d", len(v1.Tools))
 	}
 	jq := v1.Tools["jq"]
 	if jq.RecipeID != "jq" || !jq.Present || !strings.Contains(jq.Version, "jq-1.7.1") {

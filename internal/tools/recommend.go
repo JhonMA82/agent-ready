@@ -54,7 +54,7 @@ func Recommend(root string) (RecommendFacts, error) {
 	candidates := []Candidate{}
 	githubRemote := gitHubRemote(root)
 	if hasOutputDirs(root) {
-		candidates = append(candidates, candidate(caps, "token_optimized_shell", "RTK", "rtk", "build/test outputs are large", "output directories present", "large build/test outputs dominate shell output; RTK is a provider candidate without install/config/integration support"))
+		candidates = append(candidates, candidate(caps, "token_optimized_shell", "RTK", "rtk", "build/test outputs are large", "output directories present", "large build/test outputs dominate shell output; RTK is a productivity candidate whose binary install is consent-gated and whose OpenCode global integration is a separate opt-in"))
 	}
 	if githubRemote != "" {
 		candidates = append(candidates, candidate(caps, "github_context", "gh", "gh", "GitHub remote", githubRemote, "the repository declares a GitHub remote; gh is detectable and provides GitHub context"))

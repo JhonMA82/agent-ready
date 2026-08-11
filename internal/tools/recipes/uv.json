@@ -1,0 +1,1 @@
+{"id":"uv","executables":["uv"],"version_args":["--version"],"install":{"apt":{"executable":"apt","args":["install","-y","uv"]},"pacman":{"executable":"pacman","args":["-S","--needed","uv"]},"dnf":{"executable":"dnf","args":["install","-y","uv"]},"brew":{"executable":"brew","args":["install","uv"]}}}

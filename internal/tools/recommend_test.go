@@ -178,6 +178,21 @@ func TestRecommendDetectOnlyTools(t *testing.T) {
 			}
 		})
 	}
+	// §45: every detect-only toolchain entry (npm…tofu, plus the §20 entries
+	// without recipes) carries executables/versionArgs and honest capability
+	// truth: detect and version supported, install never claimed.
+	detectOnly := []string{"bun", "bundle", "cargo", "cmake", "conan", "dart", "deno", "dotnet",
+		"flutter", "go", "gradle", "maven", "mix", "nix", "node", "npm", "pdm", "pip", "pipenv",
+		"pnpm", "poetry", "rustup", "terraform", "tofu", "yarn"}
+	for _, id := range detectOnly {
+		entry := entryByID(t, id)
+		if entry.Install != nil || len(entry.Executables) == 0 || len(entry.VersionArgs) == 0 {
+			t.Fatalf("%s must be detect-only with executables/versionArgs: %+v", id, entry)
+		}
+		if entry.Capabilities.Detect != Supported || entry.Capabilities.Version != Supported || entry.Capabilities.Install != Unsupported {
+			t.Fatalf("%s must claim detect/version only: %+v", id, entry.Capabilities)
+		}
+	}
 }
 
 func TestRecommendProviderWithoutLifecycle(t *testing.T) {
