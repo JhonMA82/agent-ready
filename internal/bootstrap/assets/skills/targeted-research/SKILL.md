@@ -1,6 +1,6 @@
 ---
 name: targeted-research
-description: "Trigger: closing an evidence gap in an audit. Research a concrete question about the repository, its dependencies, or the pinned runtime; record source and version; stop when answered."
+description: "Trigger: closing an evidence gap in an audit. Research a concrete question about the repository, its dependencies, or the installed OpenCode runtime; record source and version; stop when answered."
 ---
 Close evidence gaps with the smallest useful search. Load `references/search-strategies.md` before choosing a search order; label findings per repository-analysis `references/evidence-labels.md`.
 
@@ -19,7 +19,7 @@ Run when a decision lacks a FACT and repository evidence alone cannot close the 
 ## Execution Steps
 1. State the concrete question and the decision it supports.
 2. Run the search ladder in `references/search-strategies.md` order.
-3. Fix the exact version: pinned OpenCode 1.18.15 or the version the question names.
+3. Fix the exact version: the installed OpenCode version (minimum compatible 1.18.15) or the version the question names.
 4. Record each answer with its source and version; classify FACT or INFERENCE; attach gate evidence or a reasoned exemption for version-sensitive answers.
 5. Stop at the first source that answers; report the stopping condition.
 

@@ -16,7 +16,7 @@ How to close an evidence gap with the smallest useful search. Read this referenc
 ## Rules
 
 - **Concrete question**: state what decision the research supports before searching; a question without a decision is a topic, not research.
-- **Exact version**: search against the version actually in the repository — pinned OpenCode 1.18.15, the dependency version, or the version the question names. Never accept advice for an unspecified or different version.
+- **Exact version**: search against the version actually in the repository — the installed OpenCode version (minimum compatible 1.18.15), the dependency version, or the version the question names. Never accept advice for an unspecified or different version.
 - **Tool facts first**: when a decision involves tool capabilities, run `agent-ready tools status --json` (and `tools recommend --json` for candidate evidence) when available and treat the output as FACT. When the command is absent, reason from repository signals and note candidates without blocking — never invent tool state.
 - **Provenance**: every answer records its source and version; a source-less answer is UNKNOWN, not FACT.
 - **External Verification Gate**: before an answer embeds central, version-sensitive framework, package-manager, or toolchain knowledge, it MUST cite current official or versioned evidence tied to the applicable version, or carry an explicit reasoned exemption showing that no external claim is embedded. Existing repository-to-official research precedence stays intact: repository and local sources still come first, and official or versioned sources are consulted for the exact version in use.

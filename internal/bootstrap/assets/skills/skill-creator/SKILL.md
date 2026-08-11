@@ -10,7 +10,7 @@ Run when the artifact decision names CREATE for a specific skill, the proposal i
 ## Hard Rules
 - Never decide necessity: CREATE was already decided; missing evidence holds the skill, it does not trigger authoring.
 - Never invent files, APIs, or flows; every instruction maps to a harness fact or collected evidence.
-- No generic advice: anchor instructions to this repository, its layout, and pinned OpenCode 1.18.15.
+- No generic advice: anchor instructions to this repository, its layout, and the installed OpenCode version (minimum compatible 1.18.15).
 - Keep the body minimal; move procedure and detail into `references/`.
 
 ## Execution Steps

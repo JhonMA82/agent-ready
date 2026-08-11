@@ -11,7 +11,7 @@ Run `agent-ready <command> --help` for flags. All fact helpers accept `--json`.
 | `agent-ready init` | Bootstrap the harness in the current repository | Yes (repo only) |
 | `agent-ready update [--dry-run]` | Refresh harness assets to the installed binary's assets; ownership-preserving | Yes |
 | `agent-ready status` | Facts: manifest, installed assets, mismatches, checkpoint, config, tools | No |
-| `agent-ready doctor` | Read-only checks: repo, pinned OpenCode, harness, command, skills, tools | No |
+| `agent-ready doctor` | Read-only checks: repo, minimum compatible OpenCode, harness, command, skills, tools | No |
 | `agent-ready remove --mode harness-only\|harness+generated` | Ownership-driven removal; modified/unowned files are never deleted | Yes |
 | `agent-ready --version` | Version metadata injected at build time | No |
 
@@ -20,7 +20,7 @@ Run `agent-ready <command> --help` for flags. All fact helpers accept `--json`.
 | Command | Facts emitted |
 |---|---|
 | `agent-ready inspect --json` | OS-independent inventory: dependencies, scripts, workspaces, files, CI |
-| `agent-ready validate --json` | Skill frontmatter vs pinned OpenCode, progressive disclosure, ownership |
+| `agent-ready validate --json` | Skill frontmatter vs installed OpenCode, progressive disclosure, ownership |
 | `agent-ready checkpoint save --stage S [--complete]` | Go-owned envelope (latest == history bytes) |
 | `agent-ready checkpoint status` | Latest checkpoint or none |
 | `agent-ready changes --json` | Diff vs last checkpoint; first run reports the full inventory as added |

@@ -16,7 +16,8 @@ import (
 // (audit-evidence-gates: External Verification Gate and reviewer rejection
 // contract). The grounded cohort reviews a candidate skill whose
 // version-sensitive toolchain knowledge cites current versioned evidence
-// (OpenCode 1.18.15 official documentation) and must be accepted; the
+// (official documentation for the installed OpenCode runtime, any version at
+// or above the minimum compatible floor) and must be accepted; the
 // ungrounded cohort reviews a candidate skill that embeds framework claims
 // without versioned evidence or exemption and must be rejected (or the
 // exemption explicitly handled). The structural oracle observes JSONL events
@@ -157,7 +158,7 @@ func assertReviewStructure(t *testing.T, events auditEvents, doc, cohort string)
 	if !reasoned {
 		t.Fatal("review verdict must carry a reason")
 	}
-	versioned := strings.Contains(lower, "versioned evidence") || strings.Contains(lower, "official") || strings.Contains(lower, "documentation") || strings.Contains(lower, "1.18.15") || strings.Contains(lower, "version-sensitive")
+	versioned := strings.Contains(lower, "versioned evidence") || strings.Contains(lower, "official") || strings.Contains(lower, "documentation") || strings.Contains(lower, "installed version") || strings.Contains(lower, "1.18.15") || strings.Contains(lower, "version-sensitive")
 	switch cohort {
 	case "grounded":
 		verdict := reviewVerdict(lower)

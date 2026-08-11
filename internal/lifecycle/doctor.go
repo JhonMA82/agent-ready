@@ -31,7 +31,7 @@ type DoctorFacts struct {
 const DoctorSchemaVersion = "agent-ready.doctor/v1"
 
 // Doctor runs the §34 read-only checks. Required failures (repository,
-// pinned opencode, initialized harness) make Healthy false (the command
+// compatible opencode, initialized harness) make Healthy false (the command
 // exits 1); recommended-tool warnings keep Healthy true (exit 0).
 func Doctor(ctx context.Context, root string) (DoctorFacts, error) {
 	facts := DoctorFacts{SchemaVersion: DoctorSchemaVersion, Healthy: true}
@@ -48,10 +48,13 @@ func Doctor(ctx context.Context, root string) (DoctorFacts, error) {
 	} else {
 		add("repository", "ok", "")
 	}
-	if _, err := opencode.Preflight(ctx, []byte("{}")); err != nil {
+	if res, err := opencode.Preflight(ctx, []byte("{}")); err != nil {
 		add("opencode", "fail", err.Error())
 	} else {
-		add("opencode", "ok", "version "+opencode.RequiredVersion())
+		add("opencode", "ok", "version "+res.Version)
+		if res.Drift != "" {
+			add("opencode drift", "warning", res.Drift)
+		}
 	}
 	if _, version, _, err := installedManifest(root); err != nil {
 		add("initialized", "fail", err.Error())

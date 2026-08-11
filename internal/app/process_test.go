@@ -42,7 +42,7 @@ func TestProcessAcceptance(t *testing.T) {
 		t.Fatal(err)
 	}
 	fake := filepath.Join(binDir, "opencode")
-	if err := os.WriteFile(fake, []byte("#!/bin/sh\nprintf '%s\\n' '"+opencode.RequiredVersion()+"'\n"), 0o755); err != nil {
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\nprintf '%s\\n' '"+opencode.TestedVersion()+"'\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	build := exec.Command("go", "build", "-o", binary, "./cmd/agent-ready")
@@ -246,7 +246,7 @@ func TestInitRerunAfterModelWrites(t *testing.T) {
 		t.Fatal(err)
 	}
 	fake := filepath.Join(binDir, "opencode")
-	if err := os.WriteFile(fake, []byte("#!/bin/sh\nprintf '%s\\n' '"+opencode.RequiredVersion()+"'\n"), 0o755); err != nil {
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\nprintf '%s\\n' '"+opencode.TestedVersion()+"'\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	build := exec.Command("go", "build", "-o", binary, "./cmd/agent-ready")

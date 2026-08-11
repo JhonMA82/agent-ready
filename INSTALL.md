@@ -9,7 +9,7 @@ the repository it runs in (spec acceptance A and Q).
 
 - Linux, macOS, or Windows (WSL for the script on Windows)
 - Git
-- OpenCode 1.18.15 (pinned compatibility version)
+- OpenCode ≥ 1.18.15 (minimum compatible version; tested baseline 1.18.15)
 
 ## Option 1: One-liner (Linux/macOS)
 

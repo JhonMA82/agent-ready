@@ -60,4 +60,4 @@ Every harness skill is validated against a rubric (necessity 25, repository-spec
 | 70–84 | REVISE |
 | < 70 | REJECT |
 
-Scores force justification; canonical examples (`excellent-simple`, `excellent-complex`, `bad-generic`, `unnecessary-skill`) calibrate what good looks like. The frontmatter of every skill is machine-validated against the pinned OpenCode 1.18.15 rules.
+Scores force justification; canonical examples (`excellent-simple`, `excellent-complex`, `bad-generic`, `unnecessary-skill`) calibrate what good looks like. The frontmatter of every skill is machine-validated against the installed OpenCode rules (minimum compatible 1.18.15).

@@ -48,7 +48,7 @@ Next: /agent-ready
 
 ## 3. Run the audit
 
-Open the repository in OpenCode (1.18.15) and run:
+Open the repository in OpenCode (≥ 1.18.15) and run:
 
 ```
 /agent-ready
@@ -69,14 +69,14 @@ agent-ready remove     → remove the harness (two modes, ownership-safe)
 ## Requirements
 
 - Git
-- OpenCode 1.18.15 (pinned compatibility version)
+- OpenCode ≥ 1.18.15 (minimum compatible version)
 - A model of your choice — see [Recommended models](recommended-models.md)
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---|---|
-| `init` refuses: "OpenCode 1.18.15 required" | `opencode --version`; install the pinned version |
+| `init` refuses on an OpenCode below 1.18.15 | `opencode --version`; install OpenCode ≥ 1.18.15 |
 | `init` refuses on a conflict | an unowned or modified target exists; resolve or remove it, then retry |
-| `/agent-ready` not found | verify `.opencode/commands/agent-ready.md` exists and OpenCode is 1.18.15 |
+| `/agent-ready` not found | verify `.opencode/commands/agent-ready.md` exists and OpenCode is ≥ 1.18.15 |
 | `doctor` exits 1 | a required check failed (`git`/`opencode`/initialized harness); read the named check |
