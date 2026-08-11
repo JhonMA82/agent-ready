@@ -22,6 +22,16 @@ Procedure for the mandatory review gate. Read this reference when a candidate sk
 
 REJECT an artifact when it has missing required assessment, unsupported package-manager certainty, framework/toolchain claims that fail the External Verification Gate, capability claims exceeding tested support, hidden conflicts, migration decisions presented as facts, or semantic verdicts routed through Go. NO_ACTION and Tool Budget remain valid model-owned outcomes and are never grounds for rejection.
 
+## Named checks
+
+Run all four named checks on every candidate:
+- `framework_grounding`: framework guidance traces to repository or verified external evidence for the version in use.
+- `package_manager_accuracy`: the named package manager matches repository evidence (npm vs Bun or pnpm; pip vs uv).
+- `toolchain_accuracy`: claimed validated workflows exist (no `cargo test` as validated when the repository has no tests).
+- `external_verification_when_required`: version-sensitive claims carry the evidence the rule requires, and the `external_verified_evidence` / `external_verification_not_required` vocabulary is verified on every central-framework artifact.
+
+A failing named check is a blocking concern: REJECT the artifact.
+
 ## Blocking concerns
 - A numeric PASS never overrides a blocking concern: if the skill would mislead the model, record the concern and do not PASS.
 - "N skills generated" is never evidence; per-skill scores with justification are.

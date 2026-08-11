@@ -126,6 +126,26 @@ func TestEmbeddedAssetUpgradeGateSlice10(t *testing.T) {
 	})
 }
 
+// TestEmbeddedAssetUpgradeGateSlice11 reruns the Slice 1 parameterized gate
+// over Slice 11's declared changed assets (v1-close slice 4, content
+// contracts): the ten Tool Budget / seven-questions / skill_request /
+// named-checks / vocabulary contract files must advance unchanged, preserve
+// modifications, install when absent, and keep protected state intact, with
+// the ownership manifest hashes regenerating for every changed asset. As in
+// earlier slices, the new-marked entry (audit-flow.md) models an older
+// install lacking that path so the gate can prove absent installation and
+// unmanaged collisions for this slice's asset set.
+func TestEmbeddedAssetUpgradeGateSlice11(t *testing.T) {
+	runEmbeddedAssetUpgradeGate(t, "slice-11-content-contracts", []assetUpgrade{
+		{path: ".agent-ready/skills/agent-ready-orchestrator/SKILL.md", old: []byte("old orchestrator skill\n")},
+		{path: ".agent-ready/skills/artifact-design/SKILL.md", old: []byte("old artifact design\n")},
+		{path: ".agent-ready/skills/agent-ready-orchestrator/references/audit-flow.md", new: true},
+		{path: ".agent-ready/skills/skill-creator/SKILL.md", old: []byte("old creator skill\n")},
+		{path: ".agent-ready/skills/skill-reviewer/SKILL.md", old: []byte("old reviewer skill\n")},
+		{path: ".agent-ready/skills/targeted-research/references/search-strategies.md", old: []byte("old search strategies\n")},
+	})
+}
+
 func runEmbeddedAssetUpgradeGate(t *testing.T, slice string, changedAssets []assetUpgrade) {
 	t.Helper()
 	t.Run(slice+"/advances-and-installs", func(t *testing.T) {

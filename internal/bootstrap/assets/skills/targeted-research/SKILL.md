@@ -13,6 +13,7 @@ Run when a decision lacks a FACT and repository evidence alone cannot close the 
 - Search repository first, then local docs, then version metadata, then official docs, then a specialized provider; use the broader web only if necessary.
 - Record source and version with every answer; an answer without provenance is not evidence.
 - External Verification Gate: before an answer embeds central, version-sensitive framework, package-manager, or toolchain knowledge, attach current official or versioned evidence tied to the applicable version, or an explicit reasoned exemption showing that no external claim is embedded; repository-to-official research precedence stays intact.
+- Name the evidence or the exemption: output that embeds central framework guidance MUST state `external_verified_evidence` non-empty, or carry the explicit exemption `external_verification_not_required`.
 - Stop when the question is answered; keep searching only if the answer still lacks a source.
 - No search tool available never blocks: derive from local sources or stop with ASK_USER.
 
