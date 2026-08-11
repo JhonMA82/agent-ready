@@ -109,6 +109,9 @@ func main() {
 	changes := cli.Helper{Name: "changes", Run: withRoot(func(root string) (any, error) { return checkpoint.Changes(root) })}
 	state := cli.Helper{Name: "state", Run: withRoot(func(root string) (any, error) { return statestore.Read(root) })}
 	toolsStatus := cli.Helper{Name: "status", Run: func(context.Context, cli.Options) (any, error) { return tools.Status() }}
+	toolsExplain := cli.Helper{Name: "explain", Use: "explain TOOL", Run: func(_ context.Context, options cli.Options) (any, error) {
+		return tools.Explain(options.Tool)
+	}}
 	toolsDoctor := cli.Helper{Name: "doctor", Run: withRoot(func(root string) (any, error) {
 		facts, err := tools.Doctor(root)
 		if err != nil {
@@ -137,7 +140,7 @@ func main() {
 		}
 		return tools.Install(plan)
 	}}
-	toolsCmd := cli.Helper{Name: "tools", Subs: []cli.Helper{toolsStatus, toolsDoctor, toolsRecommend, toolsInstall}}
+	toolsCmd := cli.Helper{Name: "tools", Subs: []cli.Helper{toolsStatus, toolsDoctor, toolsRecommend, toolsInstall, toolsExplain}}
 	status := cli.Helper{Name: "status", Run: withRoot(func(root string) (any, error) { return lifecycle.Status(root) })}
 	doctor := cli.Helper{Name: "doctor", Run: func(ctx context.Context, _ cli.Options) (any, error) {
 		selection, err := repository.Discover(ctx, "", "git")

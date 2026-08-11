@@ -34,25 +34,54 @@ type ToolFamily struct {
 	Tools []FamilyTool `json:"tools"`
 }
 
-// FamilyTool is one tool's presence evidence and independent capability truth.
+// FamilyTool is one tool's presence evidence, capability truth, and §20
+// additive safety metadata (optional, never required).
 type FamilyTool struct {
-	ID           string       `json:"id"`
-	Present      bool         `json:"present"`
-	Version      string       `json:"version,omitempty"`
-	Capabilities Capabilities `json:"capabilities"`
+	ID              string       `json:"id"`
+	Present         bool         `json:"present"`
+	Version         string       `json:"version,omitempty"`
+	Capabilities    Capabilities `json:"capabilities"`
+	SafetyLevel     SafetyLevel  `json:"safety_level,omitempty"`
+	Methods         []string     `json:"methods,omitempty"`
+	SideEffects     string       `json:"side_effects,omitempty"`
+	IntegrationMode string       `json:"integration_mode,omitempty"`
 }
 
 // SchemaVersion is the agent-ready.tools/v1 schema.
 const SchemaVersion = "agent-ready.tools/v1"
 
-// DetectPackageManager finds the first available package manager binary.
+// pmOrder is the §21 detection order (D10); AUR helpers and nix are absent:
+// AUR is opt-in only, nix is an environment, never an automatic installer.
+var pmOrder = []string{"apt", "pacman", "dnf", "brew", "zypper", "apk", "winget"}
+
+// aurHelpers are AUR package helpers; opt-in only, never auto-selected.
+var aurHelpers = []string{"yay", "paru"}
+
+// DetectPackageManager finds the first available package manager binary in
+// fixed §21 order.
 func DetectPackageManager() string {
-	for _, pm := range []string{"apt", "pacman", "dnf", "brew"} {
+	for _, pm := range pmOrder {
 		if path, err := exec.LookPath(pm); err == nil && path != "" {
 			return pm
 		}
 	}
 	return ""
+}
+
+// detectAUR reports the first available AUR helper for opt-in-only remediation.
+func detectAUR() string {
+	for _, name := range aurHelpers {
+		if path, err := exec.LookPath(name); err == nil && path != "" {
+			return name
+		}
+	}
+	return ""
+}
+
+// nixPresent reports whether nix is available as an environment.
+func nixPresent() bool {
+	path, err := exec.LookPath("nix")
+	return err == nil && path != ""
 }
 
 // Status collects deterministic facts for every catalog tool. The V1 tools
@@ -69,6 +98,8 @@ func Status() (Facts, error) {
 		}
 		byFamily[entry.Family] = append(byFamily[entry.Family], FamilyTool{
 			ID: entry.ID, Present: present, Version: version, Capabilities: entry.Capabilities,
+			SafetyLevel: entry.SafetyLevel, Methods: entry.Methods, SideEffects: entry.SideEffects,
+			IntegrationMode: entry.IntegrationMode,
 		})
 	}
 	for _, family := range []Family{FamilyEcosystem, FamilyProductivity, FamilyProvider} {

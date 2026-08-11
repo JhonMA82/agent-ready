@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -39,8 +40,16 @@ func TestPlanSelectionAndFailClosed(t *testing.T) {
 	// Empty PATH -> no PM.
 	empty := t.TempDir()
 	t.Setenv("PATH", empty)
-	if _, err := Plan("rg"); err == nil || !strings.Contains(err.Error(), "no supported package manager") {
-		t.Fatalf("no-PM must fail closed, got %v", err)
+	if _, err := Plan("rg"); err == nil || !strings.Contains(err.Error(), "no supported package manager") || !strings.Contains(err.Error(), "remediation") {
+		t.Fatalf("no-PM must fail closed with remediation, got %v", err)
+	}
+	// §21/OQ-1 fail-closed: AUR opt-in only; nix environment-only; nothing
+	// executes.
+	for bin, want := range map[string]string{"yay": "opt-in", "paru": "opt-in", "nix": "environment only"} {
+		t.Setenv("PATH", fakeExecutable(t, bin, "#!/bin/sh\nexit 0\n"))
+		if _, err := Plan("rg"); err == nil || !strings.Contains(err.Error(), want) || !strings.Contains(err.Error(), "remediation") {
+			t.Fatalf("%s-only host must fail closed with %q + remediation, got %v", bin, want, err)
+		}
 	}
 }
 
@@ -125,10 +134,28 @@ func TestInstallSupportBackedByRecipe(t *testing.T) {
 
 func TestConfirmConsentNeverDefaultsYes(t *testing.T) {
 	plan := InstallPlan{Tool: "rg", PM: "apt", Executable: "apt", Args: []string{"install", "-y", "ripgrep"}}
+	// §46: empty or unreadable input declines via the read-error path.
 	for input, want := range map[string]bool{"n": false, "N": false, "": false, "no": false, "y": true, "Y": true, "yes": true} {
 		got, err := ConfirmConsent(strings.NewReader(input+"\n"), plan)
 		if err != nil || got != want {
 			t.Fatalf("input %q: got %v %v, want %v", input, got, err, want)
 		}
+	}
+}
+
+// §46 UX golden: the complete plan renders before the consent prompt.
+func TestRenderPlanUXGolden(t *testing.T) {
+	plan := InstallPlan{Tool: "uv", Kind: "ecosystem", Evidence: "verified embedded recipe", PM: "apt",
+		Method: "verified recipe", Level: SafetySafeRecipe, Executable: "apt", Args: []string{"install", "-y", "uv"}}
+	var out bytes.Buffer
+	RenderPlan(&out, plan)
+	want := strings.Join([]string{
+		"Tool: uv", "Kind: ecosystem", "Evidence: verified embedded recipe", "Safety level: SAFE_RECIPE",
+		"", "Plan", "  platform: " + runtime.GOOS, "  method: verified recipe", "  executable: apt", "  args: install -y uv",
+		"", "Changes", "  installs user-level/global executable", "  does NOT modify OpenCode",
+		"  does NOT modify project dependencies", "", "Proceed? [y/N] ",
+	}, "\n")
+	if out.String() != want {
+		t.Fatalf("plan render mismatch:\ngot:\n%s\nwant:\n%s", out.String(), want)
 	}
 }

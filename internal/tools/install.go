@@ -6,19 +6,25 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 )
 
 // InstallPlan is the exact, reviewable installation plan rendered before any
-// execution (spec §19). Elevation is modeled separately and is never part of
-// recipe args; V1 recipes are non-elevated.
+// execution (spec §46): tool, kind, evidence, safety level, side effects,
+// and the plan fields. Elevation is modeled separately, never in args.
 type InstallPlan struct {
-	Tool       string   `json:"tool"`
-	PM         string   `json:"pm"`
-	Executable string   `json:"executable"`
-	Args       []string `json:"args"`
-	Elevation  bool     `json:"elevation"`
-	Reason     string   `json:"reason"`
+	Tool        string      `json:"tool"`
+	Kind        string      `json:"kind,omitempty"`
+	Evidence    string      `json:"evidence,omitempty"`
+	PM          string      `json:"pm"`
+	Method      string      `json:"method,omitempty"`
+	Level       SafetyLevel `json:"level,omitempty"`
+	SideEffects string      `json:"side_effects,omitempty"`
+	Executable  string      `json:"executable"`
+	Args        []string    `json:"args"`
+	Elevation   bool        `json:"elevation"`
+	Reason      string      `json:"reason"`
 }
 
 // InstallResult reports the execution and post-install verification outcome.
@@ -34,7 +40,8 @@ const InstallSchemaVersion = "agent-ready.install/v1"
 
 // Plan selects the single verified recipe for the detected package manager
 // and renders the exact execution plan. It fails closed with remediation
-// when the tool has no recipe or the platform has no supported PM.
+// when the tool has no recipe or the platform has no supported PM; AUR is
+// opt-in only (never auto-selected) and nix is environment-only.
 func Plan(toolID string) (InstallPlan, error) {
 	if toolID == "" {
 		return InstallPlan{}, errors.New("tool id required")
@@ -51,13 +58,24 @@ func Plan(toolID string) (InstallPlan, error) {
 	}
 	pm := DetectPackageManager()
 	if pm == "" {
-		return InstallPlan{}, errors.New("no supported package manager detected (apt, pacman, dnf, brew)")
+		if aur := detectAUR(); aur != "" {
+			return InstallPlan{}, fmt.Errorf("only the AUR helper %q is available; AUR is opt-in only and never auto-selected (remediation: install a supported package manager or use an explicitly approved AUR flow)", aur)
+		}
+		if nixPresent() {
+			return InstallPlan{}, errors.New("nix is detected as an environment only and is never used as an automatic universal installer (remediation: install a supported package manager: apt, pacman, dnf, brew, zypper, apk, winget)")
+		}
+		return InstallPlan{}, errors.New("no supported package manager detected (apt, pacman, dnf, brew, zypper, apk, winget); remediation: install one of these package managers")
 	}
 	op, ok := entry.Install[pm]
 	if !ok {
 		return InstallPlan{}, fmt.Errorf("no verified %s recipe for %q; supported managers: %s", pm, toolID, recipeManagers(*entry))
 	}
-	return InstallPlan{Tool: toolID, PM: pm, Executable: op.Executable, Args: append([]string{}, op.Args...), Elevation: false, Reason: "verified embedded recipe"}, nil
+	return InstallPlan{
+		Tool: toolID, Kind: string(entry.Family), Evidence: "verified embedded recipe",
+		PM: pm, Method: "verified recipe", Level: entry.SafetyLevel, SideEffects: entry.SideEffects,
+		Executable: op.Executable, Args: append([]string{}, op.Args...), Elevation: false,
+		Reason: "verified embedded recipe",
+	}, nil
 }
 
 // recipeIDs lists the recipe-backed catalog entries.
@@ -110,12 +128,26 @@ func presentAfterInstall(toolID string) (bool, string) {
 	return false, ""
 }
 
-// ConfirmConsent reads one line from r and returns true only for an
-// explicit affirmative answer. Any read failure or empty input declines:
-// consent never defaults to yes.
+// RenderPlan writes the §46 install plan and consent prompt to w: tool, kind,
+// evidence, safety level, side effects, the plan fields, and the three
+// Changes lines, followed by the explicit-consent prompt.
+func RenderPlan(w io.Writer, plan InstallPlan) {
+	fmt.Fprintf(w, "Tool: %s\nKind: %s\nEvidence: %s\n", plan.Tool, plan.Kind, plan.Evidence)
+	if plan.Level != "" {
+		fmt.Fprintf(w, "Safety level: %s\n", plan.Level)
+	}
+	if plan.SideEffects != "" {
+		fmt.Fprintf(w, "Side effects: %s\n", plan.SideEffects)
+	}
+	fmt.Fprintf(w, "\nPlan\n  platform: %s\n  method: %s\n  executable: %s\n  args: %s\n", runtime.GOOS, plan.Method, plan.Executable, strings.Join(plan.Args, " "))
+	fmt.Fprint(w, "\nChanges\n  installs user-level/global executable\n  does NOT modify OpenCode\n  does NOT modify project dependencies\n\nProceed? [y/N] ")
+}
+
+// ConfirmConsent renders the plan to stdout, reads one line from r, and
+// returns true only for an explicit affirmative answer. Any read failure or
+// empty input declines: consent never defaults to yes.
 func ConfirmConsent(r io.Reader, plan InstallPlan) (bool, error) {
-	fmt.Fprintf(os.Stdout, "Plan: install %s via %s %s\n", plan.Tool, plan.Executable, strings.Join(plan.Args, " "))
-	fmt.Fprint(os.Stdout, "Proceed? [y/N] ")
+	RenderPlan(os.Stdout, plan)
 	var answer string
 	if _, err := fmt.Fscanln(r, &answer); err != nil {
 		return false, nil // unreadable or empty input declines
