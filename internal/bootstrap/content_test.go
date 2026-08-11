@@ -281,6 +281,59 @@ func TestSkillCreatorReviewerContent(t *testing.T) {
 			t.Fatalf("route(%s) != %q", rel, want)
 		}
 	}
+
+	// Slice 4 audit-evidence-gates contract: skill-creator authors from a
+	// structured skill_request declaring purpose, repository_evidence,
+	// framework_evidence, external_verified_evidence, canonical_examples,
+	// invariants, commands, and validation; when external_verified_evidence
+	// is required and empty the creator never invents external framework
+	// guidance and reports the missing evidence instead.
+	creatorDoc := readAsset(t, "assets/skills/skill-creator/SKILL.md")
+	for _, marker := range []string{
+		"skill_request", "purpose", "repository_evidence", "framework_evidence",
+		"external_verified_evidence", "canonical_examples", "invariants", "commands",
+		"validation", "Never invent external framework guidance", "report the missing evidence",
+	} {
+		if !strings.Contains(creatorDoc, marker) {
+			t.Fatalf("skill-creator missing skill_request marker %q", marker)
+		}
+	}
+	authoring := readAsset(t, "assets/skills/skill-creator/references/authoring-procedure.md")
+	for _, marker := range []string{
+		"skill_request", "repository_evidence", "framework_evidence",
+		"external_verified_evidence", "canonical_examples", "invariants", "commands",
+		"validation", "explicitly waive", "never invent external framework guidance",
+		"report the missing evidence",
+	} {
+		if !strings.Contains(authoring, marker) {
+			t.Fatalf("authoring-procedure missing skill_request marker %q", marker)
+		}
+	}
+
+	// Slice 4 audit-evidence-gates contract: the reviewer applies the named
+	// checks framework_grounding, package_manager_accuracy,
+	// toolchain_accuracy, and external_verification_when_required and must
+	// reject npm-claims-on-Bun/pnpm repositories, pip-claims-on-uv, cargo
+	// test claims without tests, and unverified framework API usage.
+	for _, marker := range []string{
+		"framework_grounding", "package_manager_accuracy", "toolchain_accuracy",
+		"external_verification_when_required", "Bun or pnpm", "uv", "cargo test",
+		"no tests", "framework API without version verification",
+	} {
+		if !strings.Contains(reviewer, marker) {
+			t.Fatalf("skill-reviewer missing named-check marker %q", marker)
+		}
+	}
+	procedure = readAsset(t, "assets/skills/skill-reviewer/references/review-procedure.md")
+	for _, marker := range []string{
+		"framework_grounding", "package_manager_accuracy", "toolchain_accuracy",
+		"external_verification_when_required", "Bun or pnpm", "pip vs uv", "no tests",
+		"blocking concern", "verified on every central-framework artifact",
+	} {
+		if !strings.Contains(procedure, marker) {
+			t.Fatalf("review-procedure missing named-check marker %q", marker)
+		}
+	}
 }
 
 // TestCanonicalExamplesContent locks the PR3 canonical examples (R6): all
@@ -470,6 +523,29 @@ func TestOrchestratorAnalysisContent(t *testing.T) {
 			t.Fatalf("inventory-facts missing audit-gate marker %q", marker)
 		}
 	}
+
+	// Slice 4 audit-evidence-gates contract: the Tool Budget minimal-set
+	// ordering is explicit in the orchestrator skill and the audit-flow
+	// reference (rg + fd + jq; + ast-grep when structural search is needed;
+	// then Semble OR Serena; CodeGraph only on clear graph value; Headroom
+	// only on a measured compression problem), heavier tools carry explicit
+	// justification, and the final set stays a model-owned outcome.
+	for _, marker := range []string{
+		"Tool Budget minimal-set ordering", "rg + fd + jq", "ast-grep", "Semble OR Serena",
+		"CodeGraph", "Headroom", "explicit justification", "model-owned",
+	} {
+		if !strings.Contains(orch, marker) {
+			t.Fatalf("orchestrator missing Tool Budget marker %q", marker)
+		}
+	}
+	for _, marker := range []string{
+		"rg + fd + jq suffice", "ast-grep precedes any semantic provider", "Semble OR Serena",
+		"CodeGraph", "Headroom", "minimal set", "model-owned outcomes", "never automatic",
+	} {
+		if !strings.Contains(auditFlow, marker) {
+			t.Fatalf("audit-flow missing Tool Budget marker %q", marker)
+		}
+	}
 }
 
 // TestResearchDesignEvolutionContent locks the PR5 skill trio (R1, R11):
@@ -626,6 +702,55 @@ func TestResearchDesignEvolutionContent(t *testing.T) {
 			t.Fatalf("artifact-decisions missing verification-gate marker %q", marker)
 		}
 	}
+
+	// Slice 4 audit-evidence-gates contract: artifact design answers the
+	// seven questions (repository-specific, repeatable, non-trivial,
+	// project-specific decisions or invariants, AGENTS/docs cheaper,
+	// deterministic script better, framework-specific guidance needs
+	// external verification) and its decision output is one of CREATE,
+	// UPDATE, REUSE, NO_ACTION, or ASK_USER; a deterministic script that
+	// fully solves the need means the skill must not be created.
+	for _, marker := range []string{
+		"Seven Questions", "repository-specific", "repeatable", "non-trivial",
+		"project-specific decisions or invariants", "AGENTS/docs solve it more cheaply",
+		"deterministic script", "framework-specific guidance require external verification",
+		"CREATE, UPDATE, REUSE, NO_ACTION, or ASK_USER",
+	} {
+		if !strings.Contains(design, marker) {
+			t.Fatalf("artifact-design missing seven-questions marker %q", marker)
+		}
+	}
+	for _, marker := range []string{
+		"Seven questions", "repository-specific", "repeatable", "non-trivial",
+		"project-specific decisions or invariants", "AGENTS/docs solve it more cheaply",
+		"deterministic script", "framework-specific guidance require external verification",
+		"decision output", "MUST NOT be created", "NO_ACTION or REUSE", "answered with evidence",
+	} {
+		if !strings.Contains(decisions, marker) {
+			t.Fatalf("artifact-decisions missing seven-questions marker %q", marker)
+		}
+	}
+
+	// Slice 4 audit-evidence-gates contract: targeted research names
+	// external_verified_evidence non-empty for artifacts embedding central
+	// framework guidance, or carries the explicit exemption
+	// external_verification_not_required; the reviewer verifies the
+	// vocabulary on every central-framework artifact.
+	for _, marker := range []string{
+		"external_verified_evidence", "external_verification_not_required", "central framework guidance",
+	} {
+		if !strings.Contains(research, marker) {
+			t.Fatalf("targeted-research missing vocabulary marker %q", marker)
+		}
+	}
+	for _, marker := range []string{
+		"external_verified_evidence", "external_verification_not_required", "central framework guidance",
+		"Tool installation is never automatic during audit", "tool/capability assessment is mandatory",
+	} {
+		if !strings.Contains(strategies, marker) {
+			t.Fatalf("search-strategies missing vocabulary marker %q", marker)
+		}
+	}
 }
 
 // TestFullSuiteFrontmatterAndProgressiveDisclosure locks the full-suite
@@ -657,5 +782,36 @@ func TestFullSuiteFrontmatterAndProgressiveDisclosure(t *testing.T) {
 		doc := readAsset(t, "assets/references/skill-system/examples/"+dir+"/SKILL.md")
 		checkFrontmatter(t, dir, doc, false)
 		checkDisclosure(t, dir, doc, "assets/references/skill-system/examples/"+dir)
+	}
+}
+
+// TestNoStaleToolScopePhrase locks the audit-evidence-gates stale-phrase
+// cleanup across the whole embedded asset tree: neither "tool management is
+// out of scope" nor its equivalent "Tool Manager is out of scope" may appear
+// anywhere; the governing rule is that tool installation is never automatic
+// during audit while tool and capability assessment stays mandatory.
+func TestNoStaleToolScopePhrase(t *testing.T) {
+	stale := []string{"tool management is out of scope", "tool manager is out of scope"}
+	err := fs.WalkDir(assetsFS, "assets", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		data, readErr := assetsFS.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		lower := strings.ToLower(string(data))
+		for _, phrase := range stale {
+			if strings.Contains(lower, phrase) {
+				t.Fatalf("stale phrase %q found in %s", phrase, path)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

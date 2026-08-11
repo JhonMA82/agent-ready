@@ -13,6 +13,7 @@ Run before a candidate skill is created or accepted, and after every REVISE rewo
 - Never accept below 85: 70-84 is REVISE, < 70 is REJECT.
 - External Verification Gate: reject framework/toolchain claims that embed version-sensitive knowledge without current official or versioned evidence tied to the applicable version, or without an explicit reasoned exemption; repository-to-official research precedence stays intact.
 - Reject artifacts with missing required assessment, unsupported package-manager certainty, capability claims exceeding tested support, hidden conflicts, migration decisions presented as facts, or semantic verdicts routed through Go. NO_ACTION and Tool Budget remain valid model-owned outcomes.
+- Run the named checks: `framework_grounding`, `package_manager_accuracy`, `toolchain_accuracy`, and `external_verification_when_required`. REJECT an artifact that says npm when the repository uses Bun or pnpm, says pip when it uses uv, presents `cargo test` as a validated workflow when the repository has no tests, or uses a framework API without version verification when the rule requires it.
 
 ## Execution Steps
 1. Load the review procedure reference.

@@ -10,6 +10,8 @@ Run when the artifact decision names CREATE for a specific skill, the proposal i
 ## Hard Rules
 - Never decide necessity: CREATE was already decided; missing evidence holds the skill, it does not trigger authoring.
 - Never invent files, APIs, or flows; every instruction maps to a harness fact or collected evidence.
+- Author from the structured `skill_request` only: purpose, repository_evidence, framework_evidence, external_verified_evidence, canonical_examples, invariants, commands, and validation — each reflected in the artifact or explicitly waived.
+- Never invent external framework guidance: when external_verified_evidence is required and empty, report the missing evidence instead of filling it.
 - No generic advice: anchor instructions to this repository, its layout, and the installed OpenCode version (minimum compatible 1.18.15).
 - Keep the body minimal; move procedure and detail into `references/`.
 

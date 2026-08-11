@@ -6,6 +6,10 @@ Procedure for authoring a candidate skill. Read this reference when authoring be
 - Approved artifact decision (CREATE + skill name), the proposal, and the evidence it cites.
 - skill-quality-rubric.md: weights sum to 100; >= 85 PASS, 70-84 REVISE, < 70 REJECT.
 
+## skill_request contract
+
+CREATE ships a structured skill_request declaring: purpose, repository_evidence, framework_evidence, external_verified_evidence, canonical_examples, invariants, commands, and validation. Reflect every field in the artifact, or explicitly waive it with a reason. When external_verified_evidence is required and empty: never invent external framework guidance — report the missing evidence in the artifact and in state.
+
 ## Procedure
 1. Verify inputs: CREATE decided and at least one FACT supports it. Missing either: hold, do not author.
 2. Name the skill `^[a-z0-9]+(-[a-z0-9]+)*$`; the directory uses the same name.

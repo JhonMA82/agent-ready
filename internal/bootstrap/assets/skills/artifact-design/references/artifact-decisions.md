@@ -24,3 +24,16 @@ The six decision verbs of the audit loop. Read this reference when a decision po
 - Migration is a proposal, not a fact: a migration decision requires evidence and approval; presenting it as a fact fails review.
 - Certainty is bounded by tested support: package-manager certainty and capability claims never exceed `tools status --json` support states.
 - Every decision is recorded in state (decisions.jsonl) with its evidence and confidence.
+
+## Seven questions (decision gate)
+
+Before deciding on a skill, answer all seven with evidence:
+1. Is the need repository-specific?
+2. Is it repeatable?
+3. Is it non-trivial?
+4. Does it contain project-specific decisions or invariants?
+5. Do AGENTS/docs solve it more cheaply?
+6. Does a deterministic script solve it better? A script that fully solves the need MUST NOT be created as a skill: choose NO_ACTION or REUSE.
+7. Does framework-specific guidance require external verification?
+
+The decision output is one of CREATE, UPDATE, REUSE, NO_ACTION, or ASK_USER (REMOVE is sync-scope only). All seven questions are answered with evidence on every decision point.
