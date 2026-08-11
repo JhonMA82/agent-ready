@@ -23,7 +23,7 @@ Expected result: `agent-ready init` creates `.agent-ready/` and registers the `/
 
 ## Installation
 
-**Requirements:** Git · OpenCode 1.18.15 (pinned) · Linux, macOS, or Windows (WSL for the script).
+**Requirements:** Git · OpenCode ≥ 1.18.15 (minimum compatible version; host updates accepted) · Linux, macOS, or Windows (WSL for the script).
 
 ### Option A — one-liner (Linux/macOS)
 
@@ -132,7 +132,7 @@ Full details, uninstall, and update semantics: [INSTALL.md](INSTALL.md).
 ## Requirements
 
 - Git
-- OpenCode 1.18.15 (pinned compatibility version)
+- OpenCode ≥ 1.18.15 (minimum compatible version; tested baseline 1.18.15)
 - Linux, macOS, or Windows (WSL for the install script)
 
 ## Status

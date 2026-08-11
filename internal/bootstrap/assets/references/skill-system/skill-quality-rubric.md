@@ -17,7 +17,7 @@ Boundaries are exact: a total of 85 is PASS, 70 is REVISE, 69 is REJECT.
 | Weight | Criterion | Full score requires |
 |---|---|---|
 | 25 | necessity | The skill does work the audit cannot complete without it; it is not a duplicate of another skill and not a nice-to-have. |
-| 20 | repository_specificity | Instructions are specific to this repository and this pinned OpenCode 1.18.15; no generic advice that could apply to any codebase. |
+| 20 | repository_specificity | Instructions are specific to this repository and its installed OpenCode version (minimum compatible 1.18.15); no generic advice that could apply to any codebase. |
 | 15 | discovery_description | `description` is one quoted line, <= 250 chars, states the trigger first, and lets the model know when to load the skill. |
 | 15 | procedural_value | The body gives an executable procedure: activation, hard rules, decision gates, execution steps, output contract. |
 | 10 | progressive_disclosure | The body stays minimal (180-450 tokens); deeper detail lives in `references/` and loads only when needed. |

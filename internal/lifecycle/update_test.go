@@ -109,6 +109,23 @@ func TestEmbeddedAssetUpgradeGateSlice9(t *testing.T) {
 	})
 }
 
+// TestEmbeddedAssetUpgradeGateSlice10 reruns the Slice 1 parameterized gate
+// over Slice 10's declared changed assets (task 4.5): the five version-decoupling
+// contract files must advance unchanged, preserve modifications, install when
+// absent, and keep protected state intact. As in earlier slices, the new-marked
+// entry (skill-quality-rubric.md) models an older install lacking that path so
+// the gate can prove absent installation and unmanaged collisions for this
+// slice's asset set.
+func TestEmbeddedAssetUpgradeGateSlice10(t *testing.T) {
+	runEmbeddedAssetUpgradeGate(t, "slice-10-opencode-decouple", []assetUpgrade{
+		{path: ".agent-ready/skills/targeted-research/SKILL.md", old: []byte("old research skill\n")},
+		{path: ".agent-ready/skills/skill-creator/SKILL.md", old: []byte("old creator skill\n")},
+		{path: ".agent-ready/references/skill-system/skill-quality-rubric.md", new: true},
+		{path: ".agent-ready/skills/targeted-research/references/search-strategies.md", old: []byte("old search strategies\n")},
+		{path: ".agent-ready/references/skill-system/anti-patterns.md", old: []byte("old anti patterns\n")},
+	})
+}
+
 func runEmbeddedAssetUpgradeGate(t *testing.T, slice string, changedAssets []assetUpgrade) {
 	t.Helper()
 	t.Run(slice+"/advances-and-installs", func(t *testing.T) {

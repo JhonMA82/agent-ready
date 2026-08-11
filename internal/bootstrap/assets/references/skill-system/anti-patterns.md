@@ -7,7 +7,7 @@ Catalog of content and usage patterns that fail the rubric. Read this reference 
 | Anti-pattern | Symptom | Why it fails | Fix |
 |---|---|---|---|
 | Context dumping | Body contains the full procedure; flow reads whole files or whole repos | Violates progressive disclosure and token discipline; bloats context, hides the trigger | Keep the body minimal; move detail to `references/`; read only what the current decision needs |
-| Generic advice | Instructions apply to any codebase; no repository-specific detail | Fails repository_specificity; the model cannot execute it here | Anchor every instruction to this repository, its layout, and pinned OpenCode 1.18.15 |
+| Generic advice | Instructions apply to any codebase; no repository-specific detail | Fails repository_specificity; the model cannot execute it here | Anchor every instruction to this repository, its layout, and the installed OpenCode version (minimum compatible 1.18.15) |
 | Vague trigger | `description` describes the topic, not when to load | Fails discovery_description; the model loads too late or too often | State the trigger first in one quoted line, <= 250 chars |
 | Procedure-less body | Rules with no order, no gates, no output contract | Fails procedural_value; the model cannot execute | Follow the required structure: activation, hard rules, gates, steps, output contract |
 | Unverifiable claims | Instructions reference files, APIs, or flows that do not exist here | Fails evidence_grounding; the model acts on invented facts | Ground every claim in a harness fact, spec requirement, or scenario |

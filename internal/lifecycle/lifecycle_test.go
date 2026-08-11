@@ -99,7 +99,7 @@ func TestStatusInitializedAndMismatch(t *testing.T) {
 func TestDoctorHealthyAndRequiredFail(t *testing.T) {
 	root := t.TempDir()
 	initRepo(t, root)
-	bin := fakeBin(t, "opencode", opencode.RequiredVersion())
+	bin := fakeBin(t, "opencode", opencode.TestedVersion())
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	facts, err := Doctor(context.Background(), root)
 	if err != nil {
