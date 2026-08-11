@@ -8,6 +8,8 @@ import (
 	"github.com/JhonMA82/agent-ready/internal/plan"
 	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 func TestInitContracts(t *testing.T) {
@@ -108,6 +110,37 @@ func TestNestedHelperContracts(t *testing.T) {
 	err := cmd.Execute()
 	if exit, ok := err.(ExitError); !ok || exit.Code != 1 || !strings.Contains(errOut.String(), "--stage is required") {
 		t.Fatalf("expected ExitError{1} with reason on stderr, got %v / %q", err, errOut.String())
+	}
+}
+
+// D7: a helper with Use takes exactly one positional arg, delivered as
+// Options.Tool (top-level and nested under a parent); missing or extra args
+// fail argument validation.
+func TestPositionalArgHelper(t *testing.T) {
+	explain := Helper{Name: "explain", Use: "explain TOOL", Run: func(_ context.Context, options Options) (any, error) {
+		return summaryFacts{Total: len(options.Tool)}, nil
+	}}
+	withNested := func() *cobra.Command { return NewRoot(nil, Helper{Name: "tools", Subs: []Helper{explain}}) }
+	for _, tt := range []struct {
+		name string
+		root func() *cobra.Command
+		args []string
+		want string
+		err  bool
+	}{
+		{"top known", func() *cobra.Command { return NewRoot(nil, explain) }, []string{"explain", "uv"}, "files: 2\n", false},
+		{"nested known", withNested, []string{"tools", "explain", "rtk"}, "files: 3\n", false},
+		{"top missing", func() *cobra.Command { return NewRoot(nil, explain) }, []string{"explain"}, "", true},
+		{"nested missing", withNested, []string{"tools", "explain"}, "", true},
+	} {
+		var out bytes.Buffer
+		cmd := tt.root()
+		cmd.SetArgs(tt.args)
+		cmd.SetOut(&out)
+		err := cmd.Execute()
+		if (err != nil) != tt.err || (!tt.err && !strings.Contains(out.String(), tt.want)) {
+			t.Fatalf("%s: output %q, error %v", tt.name, out.String(), err)
+		}
 	}
 }
 

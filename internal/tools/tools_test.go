@@ -30,8 +30,8 @@ func TestEmbeddedRecipesUnchanged(t *testing.T) {
 
 func TestCatalogOrderedSupportTruth(t *testing.T) {
 	catalog := Catalog()
-	if len(catalog) != 11 {
-		t.Fatalf("expected 11 catalog entries, got %d", len(catalog))
+	if len(catalog) != 17 {
+		t.Fatalf("expected 17 catalog entries, got %d", len(catalog))
 	}
 	for i := 1; i < len(catalog); i++ {
 		if catalog[i-1].ID >= catalog[i].ID {
@@ -45,6 +45,16 @@ func TestCatalogOrderedSupportTruth(t *testing.T) {
 		}
 		if entry.Capabilities.Detect == Supported && len(entry.Executables) == 0 {
 			t.Fatalf("%s claims detect support without executables", entry.ID)
+		}
+		// §20: every entry with install support declares a safety level.
+		if hasRecipe && entry.SafetyLevel == "" {
+			t.Fatalf("%s has a recipe but no safety level", entry.ID)
+		}
+		// OQ-1: recipe ops execute the PM binary deterministically.
+		for pm, op := range entry.Install {
+			if op.Executable != pm || len(op.Args) == 0 {
+				t.Fatalf("%s %s recipe must execute %s deterministically with fixed args, got %+v", entry.ID, pm, pm, op)
+			}
 		}
 	}
 }
@@ -70,6 +80,72 @@ func TestValidateRecipeRejectsShellMeta(t *testing.T) {
 	ok := Recipe{ID: "ok", Executables: []string{"x"}, Install: map[string]RecipeOp{"apt": {Executable: "apt", Args: []string{"install", "pkg"}}}}
 	if err := ValidateRecipe(ok); err != nil {
 		t.Fatalf("valid recipe rejected: %v", err)
+	}
+}
+
+// Threat-matrix RED: sh/bash executables and pipe args are rejected.
+func TestValidateRecipeRejectsShellAndPipe(t *testing.T) {
+	for _, tt := range []struct {
+		exe  string
+		args []string
+		want string
+	}{
+		{"sh", []string{"-c", "curl -s https://x | sh"}, "shell interpreter"},
+		{"bash", []string{"-c", "curl -s https://x | sh"}, "shell interpreter"},
+		{"curl", []string{"-sSL", "https://example.com/install.sh", "|", "sh"}, "shell metacharacters"},
+	} {
+		recipe := Recipe{ID: "bad", Executables: []string{"x"}, Install: map[string]RecipeOp{"apt": {Executable: tt.exe, Args: tt.args}}}
+		if err := ValidateRecipe(recipe); err == nil || !strings.Contains(err.Error(), tt.want) {
+			t.Fatalf("%s recipe must be rejected, got %v", tt.exe, err)
+		}
+	}
+}
+
+// D7: explain renders declared facts for a known tool and fails naming the
+// id for an unknown one, without executing or installing anything.
+func TestExplain(t *testing.T) {
+	facts, err := Explain("uv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if facts.SchemaVersion != ExplainSchemaVersion || facts.ID != "uv" || facts.Kind != "ecosystem" {
+		t.Fatalf("explain facts: %+v", facts)
+	}
+	if facts.SafetyLevel != SafetySafeRecipe || facts.Capabilities.Detect != Supported || facts.Capabilities.Install != Unsupported {
+		t.Fatalf("uv declared facts: %+v", facts)
+	}
+	if s := facts.Summary(); !strings.Contains(s, "safety_level=SAFE_RECIPE") || !strings.Contains(s, "detect=supported") {
+		t.Fatalf("summary must render safety and capability facts: %s", s)
+	}
+	facts, err = Explain("definitely-not-a-tool")
+	if err == nil || !strings.Contains(err.Error(), "definitely-not-a-tool") || !strings.Contains(err.Error(), "not in the catalog") {
+		t.Fatalf("unknown tool must fail naming the id, got %+v %v", facts, err)
+	}
+}
+
+// D10: §21 managers detect in fixed order; zypper/apk/winget hosts detect
+// their manager; AUR helpers and nix are never auto-selected.
+func TestDetectPackageManagerOrderAndNewManagers(t *testing.T) {
+	if got := strings.Join(pmOrder, ","); got != "apt,pacman,dnf,brew,zypper,apk,winget" {
+		t.Fatalf("pm order must be pinned: %s", got)
+	}
+	for _, pm := range []string{"zypper", "apk", "winget"} {
+		t.Setenv("PATH", fakeBin(t, pm, ""))
+		if got := DetectPackageManager(); got != pm {
+			t.Fatalf("%s host must detect %s, got %q", pm, pm, got)
+		}
+	}
+	// Earlier managers win even when later ones appear earlier in PATH.
+	t.Setenv("PATH", fakeBin(t, "winget", "")+string(os.PathListSeparator)+fakeBin(t, "apt", ""))
+	if got := DetectPackageManager(); got != "apt" {
+		t.Fatalf("with apt+winget, want apt, got %q", got)
+	}
+	// AUR helpers and nix are never selected, even alone.
+	for _, name := range []string{"yay", "paru", "nix"} {
+		t.Setenv("PATH", fakeBin(t, name, ""))
+		if got := DetectPackageManager(); got != "" {
+			t.Fatalf("%s must never be auto-selected, got %q", name, got)
+		}
 	}
 }
 
@@ -198,7 +274,7 @@ func TestStatusFamiliesOrderedAndStable(t *testing.T) {
 	// Golden shape: fixed-order families with ID-sorted tools, presence
 	// evidence, and all seven capability states.
 	order := []Family{FamilyEcosystem, FamilyProductivity, FamilyProvider}
-	want := [][]string{{"gh", "go", "node"}, {"ast-grep", "fd", "jq", "rg"}, {"codegraph", "context7", "rtk", "semble"}}
+	want := [][]string{{"composer", "gh", "go", "gradle", "maven", "node", "pip", "rustup", "uv"}, {"ast-grep", "fd", "jq", "rg"}, {"codegraph", "context7", "rtk", "semble"}}
 	if len(first.Families) != 3 {
 		t.Fatalf("expected 3 families, got %d", len(first.Families))
 	}
@@ -212,14 +288,26 @@ func TestStatusFamiliesOrderedAndStable(t *testing.T) {
 			}
 		}
 	}
+	eco, prod, prov := first.Families[0].Tools, first.Families[1].Tools, first.Families[2].Tools
 	// Detect-only ecosystem tools carry presence evidence yet stay
 	// uninstallable; providers never present and carry no lifecycle support.
-	eco := first.Families[0].Tools
-	if !eco[1].Present || !strings.Contains(eco[1].Version, "go version go1.24.1") || eco[1].Capabilities.Install != Unsupported {
-		t.Fatalf("go truth: %+v", eco[1])
+	if goTool := eco[2]; !goTool.Present || !strings.Contains(goTool.Version, "go version go1.24.1") || goTool.Capabilities.Install != Unsupported {
+		t.Fatalf("go truth: %+v", goTool)
 	}
-	if prod := first.Families[1].Tools; prod[3].Capabilities.Install != Supported {
-		t.Fatalf("rg truth: %+v", prod[3])
+	// §20 levels surface in status --json with recipe methods.
+	if rgTool := prod[3]; rgTool.Capabilities.Install != Supported || rgTool.SafetyLevel != SafetySafeRecipe || strings.Join(rgTool.Methods, ",") != "apt,dnf,pacman" {
+		t.Fatalf("rg truth: %+v", rgTool)
+	}
+	if !strings.Contains(string(data), `"safety_level":"SAFE_RECIPE"`) {
+		t.Fatalf("status JSON must surface the safety level: %s", data)
+	}
+	// Declared detect-only entries carry their level too.
+	if uvTool := eco[8]; uvTool.SafetyLevel != SafetySafeRecipe || uvTool.Capabilities.Install != Unsupported {
+		t.Fatalf("uv safety metadata: %+v", uvTool)
+	}
+	// RTK splits binary-install safety from its separate global side effect.
+	if rtkTool := prov[2]; rtkTool.SafetyLevel != SafetySafeRecipe || rtkTool.SideEffects != "GLOBAL_SIDE_EFFECT" || rtkTool.IntegrationMode != "opt-in" {
+		t.Fatalf("rtk split metadata: %+v", rtkTool)
 	}
 	for _, tool := range first.Families[2].Tools {
 		if tool.Present || tool.Capabilities.Install != Unsupported || tool.Capabilities.Configure != Unsupported || tool.Capabilities.Integration != Unsupported || tool.Capabilities.SideEffects != Unsupported {

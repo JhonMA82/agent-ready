@@ -23,11 +23,13 @@ type Options struct {
 type Runner func(context.Context, Options) plan.Result
 
 // Helper is a deterministic JSON-fact subcommand (spec R8): Run returns facts
-// rendered as JSON with --json or as the value's compact Summary; helpers exit
-// 0 on success, 1 on failure, and never perform semantic routing. Subs nests
-// subcommands under the helper name (e.g. checkpoint save/status).
+// as JSON with --json or as the compact Summary; helpers exit 0/1 and never
+// perform semantic routing. Subs nests subcommands. Use, when set, is the
+// usage line for one positional arg (e.g. "explain TOOL"); it enables
+// cobra.ExactArgs(1) and passes the arg as Options.Tool (D7).
 type Helper struct {
 	Name string
+	Use  string
 	Run  func(context.Context, Options) (any, error)
 	Subs []Helper
 }
@@ -99,7 +101,10 @@ func NewRootWithCommands(run Runner, update Runner, remove Runner, helpers ...He
 			root.AddCommand(parentFor(helper, &options))
 			continue
 		}
-		sub := &cobra.Command{Use: helper.Name, Short: "Emit deterministic " + helper.Name + " facts", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		sub := &cobra.Command{Use: helper.Name, Short: "Emit deterministic " + helper.Name + " facts", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 {
+				options.Tool = args[0]
+			}
 			value, err := helper.Run(cmd.Context(), options)
 			// Render a non-nil result even when Run failed so a failing
 			// helper (validate verdict fail) still emits facts before exit 1.
@@ -114,6 +119,10 @@ func NewRootWithCommands(run Runner, update Runner, remove Runner, helpers ...He
 			}
 			return nil
 		}}
+		if helper.Use != "" {
+			sub.Use = helper.Use
+			sub.Args = cobra.ExactArgs(1)
+		}
 		sub.Flags().BoolVar(&options.JSON, "json", false, "emit JSON facts")
 		if helper.Name == "validate" {
 			sub.Flags().StringVar(&options.Target, "target", "", "repository to validate (default: discovered from cwd)")
@@ -129,7 +138,10 @@ func NewRootWithCommands(run Runner, update Runner, remove Runner, helpers ...He
 func parentFor(helper Helper, options *Options) *cobra.Command {
 	sub := &cobra.Command{Use: helper.Name, Short: "Emit deterministic " + helper.Name + " facts", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() }}
 	for _, nested := range helper.Subs {
-		child := &cobra.Command{Use: nested.Name, Short: "Emit deterministic " + nested.Name + " facts", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		child := &cobra.Command{Use: nested.Name, Short: "Emit deterministic " + nested.Name + " facts", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 {
+				options.Tool = args[0]
+			}
 			value, err := nested.Run(cmd.Context(), *options)
 			if value != nil {
 				if rerr := RenderHelper(cmd.OutOrStdout(), value, options.JSON); rerr != nil && err == nil {
@@ -142,6 +154,10 @@ func parentFor(helper Helper, options *Options) *cobra.Command {
 			}
 			return nil
 		}}
+		if nested.Use != "" {
+			child.Use = nested.Use
+			child.Args = cobra.ExactArgs(1)
+		}
 		child.Flags().BoolVar(&options.JSON, "json", false, "emit JSON facts")
 		if nested.Name == "save" {
 			child.Flags().StringVar(&options.Stage, "stage", "", "checkpoint stage (e.g. exploration_plan)")

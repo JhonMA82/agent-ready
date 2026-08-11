@@ -9,8 +9,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 )
 
 // Recipe is one embedded verified install recipe: executable + fixed args
@@ -34,6 +36,12 @@ var recipesFS embed.FS
 // shellMeta rejects unverified free-form shell content in recipe args.
 var shellMeta = regexp.MustCompile(`[;&|<>$\x60\n]`)
 
+// shellInterpreters are never valid recipe executables (spec §21).
+var shellInterpreters = map[string]bool{
+	"sh": true, "bash": true, "zsh": true, "fish": true,
+	"dash": true, "ksh": true, "pwsh": true, "cmd": true,
+}
+
 // Family identifies one of the three ordered catalog families; status output
 // always serializes them in fixed order: ecosystem, productivity, provider.
 type Family string
@@ -42,6 +50,16 @@ const (
 	FamilyEcosystem    Family = "ecosystem"
 	FamilyProductivity Family = "productivity"
 	FamilyProvider     Family = "provider"
+)
+
+// SafetyLevel is the §20 install safety classification; additive metadata,
+// never required to read presence or version.
+type SafetyLevel string
+
+const (
+	SafetySafeRecipe              SafetyLevel = "SAFE_RECIPE"
+	SafetyVersionSensitive        SafetyLevel = "VERSION_SENSITIVE"
+	SafetyProjectWrapperPreferred SafetyLevel = "PROJECT_WRAPPER_PREFERRED"
 )
 
 // CapabilityState is one independent support truth value; unsupported and
@@ -69,14 +87,19 @@ type Capabilities struct {
 }
 
 // Entry is one catalog entry: stable identifier, family, detection metadata,
-// the verified install recipe when one exists, and the seven capability states.
+// the verified install recipe when one exists, the seven capability states,
+// and §20 additive safety metadata (level, methods, side effects, integration).
 type Entry struct {
-	ID           string
-	Family       Family
-	Executables  []string
-	VersionArgs  []string
-	Install      map[string]RecipeOp
-	Capabilities Capabilities
+	ID              string
+	Family          Family
+	Executables     []string
+	VersionArgs     []string
+	Install         map[string]RecipeOp
+	Capabilities    Capabilities
+	SafetyLevel     SafetyLevel
+	Methods         []string
+	SideEffects     string
+	IntegrationMode string
 }
 
 // entrySpec is the authored capability-truth row; recipe-backed entries
@@ -87,23 +110,32 @@ type entrySpec struct {
 	caps        Capabilities
 	executables []string
 	versionArgs []string
+	level       SafetyLevel
+	sideEffects string
+	integration string
 }
 
 // support is the single capability-truth table, sorted by stable identifier.
 // install: supported only where a verified embedded recipe exists and its
 // plan/execution/verification/consent behavior is tested.
 var support = []entrySpec{
-	{id: "ast-grep", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported)},
+	{id: "ast-grep", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported), level: SafetySafeRecipe},
 	{id: "codegraph", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported)},
+	{id: "composer", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"composer"}, versionArgs: []string{"--version"}, level: SafetyVersionSensitive},
 	{id: "context7", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported)},
-	{id: "fd", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported)},
-	{id: "gh", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported)},
+	{id: "fd", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported), level: SafetySafeRecipe},
+	{id: "gh", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported), level: SafetySafeRecipe},
 	{id: "go", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"go"}, versionArgs: []string{"version"}},
-	{id: "jq", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported)},
+	{id: "gradle", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"gradle"}, versionArgs: []string{"--version"}, level: SafetyProjectWrapperPreferred},
+	{id: "jq", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported), level: SafetySafeRecipe},
+	{id: "maven", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"mvn"}, versionArgs: []string{"--version"}, level: SafetyProjectWrapperPreferred},
 	{id: "node", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"node"}, versionArgs: []string{"--version"}},
-	{id: "rg", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported)},
-	{id: "rtk", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported)},
+	{id: "pip", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"pip"}, versionArgs: []string{"--version"}, level: "runtime-coupled"},
+	{id: "rg", family: FamilyProductivity, caps: caps(Supported, Supported, Unknown, Supported, Unsupported, Unsupported, Unsupported), level: SafetySafeRecipe},
+	{id: "rtk", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), level: SafetySafeRecipe, sideEffects: "GLOBAL_SIDE_EFFECT", integration: "opt-in"},
+	{id: "rustup", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"rustup"}, versionArgs: []string{"--version"}, level: SafetyVersionSensitive},
 	{id: "semble", family: FamilyProvider, caps: caps(Unsupported, Unsupported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported)},
+	{id: "uv", family: FamilyEcosystem, caps: caps(Supported, Supported, Unknown, Unsupported, Unsupported, Unsupported, Unsupported), executables: []string{"uv"}, versionArgs: []string{"--version"}, level: SafetySafeRecipe},
 }
 
 // caps is the positional seven-state constructor in Capabilities field order.
@@ -130,10 +162,17 @@ func Catalog() []Entry {
 			entry.Executables = recipe.Executables
 			entry.VersionArgs = recipe.VersionArgs
 			entry.Install = recipe.Install
+			for pm := range recipe.Install {
+				entry.Methods = append(entry.Methods, pm)
+			}
+			sort.Strings(entry.Methods)
 		} else {
 			entry.Executables = spec.executables
 			entry.VersionArgs = spec.versionArgs
 		}
+		entry.SafetyLevel = spec.level
+		entry.SideEffects = spec.sideEffects
+		entry.IntegrationMode = spec.integration
 		entries = append(entries, entry)
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].ID < entries[j].ID })
@@ -181,7 +220,8 @@ func parseRecipe(data []byte) (Recipe, error) {
 }
 
 // ValidateRecipe enforces the recipe contract: id non-empty, at least one
-// executable, fixed args with no shell metacharacters, no elevation in args.
+// executable, no shell interpreters as executables, fixed args with no shell
+// metacharacters or pipe patterns, no elevation in args.
 func ValidateRecipe(recipe Recipe) error {
 	if recipe.ID == "" {
 		return fmt.Errorf("recipe id required")
@@ -193,6 +233,9 @@ func ValidateRecipe(recipe Recipe) error {
 		if op.Executable == "" {
 			return fmt.Errorf("recipe %s: %s executable required", recipe.ID, pm)
 		}
+		if shellInterpreters[filepath.Base(op.Executable)] {
+			return fmt.Errorf("recipe %s: %s executable %q is a shell interpreter; shell recipes are rejected", recipe.ID, pm, op.Executable)
+		}
 		for _, arg := range op.Args {
 			if shellMeta.MatchString(arg) {
 				return fmt.Errorf("recipe %s: %s arg %q contains shell metacharacters", recipe.ID, pm, arg)
@@ -200,4 +243,47 @@ func ValidateRecipe(recipe Recipe) error {
 		}
 	}
 	return nil
+}
+
+// ExplainFacts is the agent-ready.explain/v1 schema: one entry's declared
+// facts, rendered without executing or installing anything.
+type ExplainFacts struct {
+	SchemaVersion string       `json:"schema_version"`
+	ID            string       `json:"id"`
+	Kind          string       `json:"kind"`
+	Capabilities  Capabilities `json:"capabilities"`
+	SafetyLevel   SafetyLevel  `json:"safety_level,omitempty"`
+	Methods       []string     `json:"methods"`
+	SideEffects   string       `json:"side_effects,omitempty"`
+	Integration   string       `json:"integration,omitempty"`
+}
+
+// ExplainSchemaVersion is the agent-ready.explain/v1 schema.
+const ExplainSchemaVersion = "agent-ready.explain/v1"
+
+// Explain returns one catalog entry's declared facts (D7) without executing
+// or installing anything; an unknown id fails naming the id.
+func Explain(toolID string) (ExplainFacts, error) {
+	for _, entry := range Catalog() {
+		if entry.ID == toolID {
+			return ExplainFacts{SchemaVersion: ExplainSchemaVersion, ID: entry.ID, Kind: string(entry.Family),
+				Capabilities: entry.Capabilities, SafetyLevel: entry.SafetyLevel, Methods: entry.Methods,
+				SideEffects: entry.SideEffects, Integration: entry.IntegrationMode}, nil
+		}
+	}
+	return ExplainFacts{}, fmt.Errorf("tool %q is not in the catalog", toolID)
+}
+
+// Summary renders the compact default output.
+func (e ExplainFacts) Summary() string {
+	level, methods := string(e.SafetyLevel), "none"
+	if level == "" {
+		level = "none"
+	}
+	if len(e.Methods) > 0 {
+		methods = strings.Join(e.Methods, ", ")
+	}
+	return fmt.Sprintf("%s: kind=%s safety_level=%s methods=%s detect=%s version=%s install=%s integration=%s side_effects=%s",
+		e.ID, e.Kind, level, methods, e.Capabilities.Detect, e.Capabilities.Version, e.Capabilities.Install,
+		e.Capabilities.Integration, e.Capabilities.SideEffects)
 }
