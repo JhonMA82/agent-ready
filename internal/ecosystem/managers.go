@@ -39,38 +39,38 @@ const (
 // managerWrapperRules are project-local executable wrappers, confirmed at
 // the top tier: stronger execution evidence than a global binary.
 var managerWrapperRules = []rule{
-	{"gradle", []string{"gradlew", "gradlew.bat"}},
-	{"maven", []string{"mvnw", "mvnw.cmd"}},
+	{"gradle", []string{"gradlew", "gradlew.bat"}, nil},
+	{"maven", []string{"mvnw", "mvnw.cmd"}, nil},
 }
 
 // managerLockfileRules are manager-specific lockfiles (confirmed).
 // Pipfile.lock confirms pipenv even though the Slice 3 signal keeps "python".
 var managerLockfileRules = []rule{
-	{"bun", []string{"bun.lock", "bun.lockb"}},
-	{"deno", []string{"deno.lock"}},
-	{"go", []string{"go.sum"}},
-	{"npm", []string{"npm-shrinkwrap.json", "package-lock.json"}},
-	{"pnpm", []string{"pnpm-lock.yaml"}},
-	{"poetry", []string{"poetry.lock"}},
-	{"pipenv", []string{"Pipfile.lock"}},
-	{"uv", []string{"uv.lock"}},
-	{"yarn", []string{"yarn.lock"}},
+	{"bun", []string{"bun.lock", "bun.lockb"}, nil},
+	{"deno", []string{"deno.lock"}, nil},
+	{"go", []string{"go.sum"}, nil},
+	{"npm", []string{"npm-shrinkwrap.json", "package-lock.json"}, nil},
+	{"pnpm", []string{"pnpm-lock.yaml"}, nil},
+	{"poetry", []string{"poetry.lock"}, nil},
+	{"pipenv", []string{"Pipfile.lock"}, nil},
+	{"uv", []string{"uv.lock"}, nil},
+	{"yarn", []string{"yarn.lock"}, nil},
 }
 
 // managerManifestRules name a single manager without confirming it (inferred).
 var managerManifestRules = []rule{
-	{"deno", []string{"deno.json", "deno.jsonc"}},
-	{"go", []string{"go.mod"}},
-	{"pip", []string{"requirements.txt"}},
-	{"pipenv", []string{"Pipfile"}},
+	{"deno", []string{"deno.json", "deno.jsonc"}, nil},
+	{"go", []string{"go.mod"}, nil},
+	{"pip", []string{"requirements.txt"}, nil},
+	{"pipenv", []string{"Pipfile"}, nil},
 }
 
 // genericManifestRules are manifests shared by several managers; when no
 // family candidate has better evidence, the family is emitted as ambiguous,
 // so pyproject.toml alone never confirms a manager.
 var genericManifestRules = []rule{
-	{"javascript", []string{"package.json"}},
-	{"python", []string{"pyproject.toml"}},
+	{"javascript", []string{"package.json"}, nil},
+	{"python", []string{"pyproject.toml"}, nil},
 }
 
 // ambiguousFamilies maps a generic manifest family to the candidates its

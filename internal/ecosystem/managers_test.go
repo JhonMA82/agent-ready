@@ -152,11 +152,11 @@ func TestResolveManagersFamilyEvidencePrecedence(t *testing.T) {
 func TestResolveManagersDeterministicAndDecisionFree(t *testing.T) {
 	paths := []string{"gradlew", "go.mod", "go.sum", "package.json", "pyproject.toml", "pnpm-lock.yaml", "bun.lock", "uv.lock"}
 	reversed := []string{"uv.lock", "bun.lock", "pnpm-lock.yaml", "pyproject.toml", "package.json", "go.sum", "go.mod", "gradlew"}
-	forward, err := json.Marshal(Detect(paths))
+	forward, err := json.Marshal(Detect("", paths))
 	if err != nil {
 		t.Fatal(err)
 	}
-	back, err := json.Marshal(Detect(reversed))
+	back, err := json.Marshal(Detect("", reversed))
 	if err != nil {
 		t.Fatal(err)
 	}
