@@ -64,7 +64,30 @@ var manifests = []struct {
 }
 
 var ciRoot = []string{".gitlab-ci.yml", ".circleci/config.yml", "azure-pipelines.yml", "Jenkinsfile"}
-var heavyTrees = []string{".venv", "bin", "node_modules", "obj", "target", "vendor"}
+
+// heavyTrees (D11, spec §9): known dependency and output trees that are never
+// recursively scanned; their existence stays path-and-kind presence evidence.
+// cmake-build-* matches by prefix; storage/logs matches by nested path.
+var heavyTrees = []string{
+	".dart_tool", ".next", ".nuxt", ".venv", "__pycache__", "_build", "bin",
+	"build", "coverage", "deps", "dist", "node_modules", "obj", "out",
+	"result", "storage/logs", "target", "vendor", "venv",
+}
+
+// isHeavyTree reports whether a directory is a heavy tree, matching exact
+// names at any depth (the same signal surface as outputSignalID), so a PHP
+// bin/console under bin/ is pruned while the bin presence signal is retained.
+func isHeavyTree(rel, name string) bool {
+	if strings.HasPrefix(name, "cmake-build-") {
+		return true
+	}
+	for _, dir := range heavyTrees {
+		if name == dir || rel == dir || strings.HasSuffix(rel, "/"+dir) {
+			return true
+		}
+	}
+	return false
+}
 
 // outputSignalDirs: §9 output/build dirs as presence signals (cmake-build-*
 // prefix, nested storage/logs); candidate-only, no verdict.
@@ -158,7 +181,7 @@ func collectFiles(root string) ([]string, []Presence, []ecosystem.Signal, Files,
 				if id := outputSignalID(rel, d.Name()); id != "" {
 					outputSignals = append(outputSignals, ecosystem.Signal{ID: id, Path: rel})
 				}
-				if slices.Contains(heavyTrees, d.Name()) {
+				if isHeavyTree(rel, d.Name()) {
 					presence = append(presence, Presence{rel, "directory"})
 					return fs.SkipDir
 				}

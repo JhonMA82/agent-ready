@@ -45,24 +45,50 @@ var managerWrapperRules = []rule{
 
 // managerLockfileRules are manager-specific lockfiles (confirmed).
 // Pipfile.lock confirms pipenv even though the Slice 3 signal keeps "python".
+// Helm confirms via Chart.lock; ansible/docker emit no manager candidate
+// (presence-only ecosystems with no lockfile signal to confirm).
 var managerLockfileRules = []rule{
 	{"bun", []string{"bun.lock", "bun.lockb"}, nil},
+	{"bundler", []string{"Gemfile.lock"}, nil},
+	{"cargo", []string{"Cargo.lock"}, nil},
+	{"composer", []string{"composer.lock"}, nil},
+	{"conan", []string{"conan.lock"}, nil},
 	{"deno", []string{"deno.lock"}, nil},
 	{"go", []string{"go.sum"}, nil},
+	{"helm", []string{"Chart.lock"}, nil},
+	{"mix", []string{"mix.lock"}, nil},
 	{"npm", []string{"npm-shrinkwrap.json", "package-lock.json"}, nil},
+	{"nuget", []string{"packages.lock.json"}, nil},
+	{"pdm", []string{"pdm.lock"}, nil},
 	{"pnpm", []string{"pnpm-lock.yaml"}, nil},
 	{"poetry", []string{"poetry.lock"}, nil},
 	{"pipenv", []string{"Pipfile.lock"}, nil},
+	{"pub", []string{"pubspec.lock"}, nil},
+	{"swift", []string{"Package.resolved"}, nil},
+	{"terraform", []string{".terraform.lock.hcl"}, nil},
 	{"uv", []string{"uv.lock"}, nil},
 	{"yarn", []string{"yarn.lock"}, nil},
 }
 
 // managerManifestRules name a single manager without confirming it (inferred).
+// rustup is inferred from rust-toolchain.toml; tofu has no lockfile signal of
+// its own, so terraform/tofu is confirmed only through .terraform.lock.hcl.
 var managerManifestRules = []rule{
+	{"bundler", []string{"Gemfile"}, nil},
+	{"cargo", []string{"Cargo.toml"}, nil},
+	{"cmake", []string{"CMakeLists.txt"}, nil},
+	{"composer", []string{"composer.json"}, nil},
+	{"conan", []string{"conanfile.py", "conanfile.txt"}, nil},
 	{"deno", []string{"deno.json", "deno.jsonc"}, nil},
 	{"go", []string{"go.mod"}, nil},
+	{"gradle", []string{"build.gradle", "settings.gradle"}, nil},
+	{"maven", []string{"pom.xml"}, nil},
+	{"mix", []string{"mix.exs"}, nil},
 	{"pip", []string{"requirements.txt"}, nil},
 	{"pipenv", []string{"Pipfile"}, nil},
+	{"pub", []string{"pubspec.yaml"}, nil},
+	{"rustup", []string{"rust-toolchain.toml"}, nil},
+	{"swift", []string{"Package.swift"}, nil},
 }
 
 // genericManifestRules are manifests shared by several managers; when no

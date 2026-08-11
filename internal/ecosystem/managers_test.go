@@ -28,6 +28,27 @@ func TestResolveManagersConfidenceLevels(t *testing.T) {
 		{"manifest infers pip", []string{"requirements.txt"}, []ManagerCandidate{{ID: "pip", Confidence: ConfidenceInferred, Evidence: []string{"requirements.txt"}}}},
 		{"manifest infers pipenv", []string{"Pipfile"}, []ManagerCandidate{{ID: "pipenv", Confidence: ConfidenceInferred, Evidence: []string{"Pipfile"}}}},
 		{"manifest infers deno", []string{"deno.json"}, []ManagerCandidate{{ID: "deno", Confidence: ConfidenceInferred, Evidence: []string{"deno.json"}}}},
+		{"lockfile confirms cargo", []string{"Cargo.lock"}, []ManagerCandidate{{ID: "cargo", Confidence: ConfidenceConfirmed, Evidence: []string{"Cargo.lock"}}}},
+		{"lockfile confirms composer", []string{"composer.lock"}, []ManagerCandidate{{ID: "composer", Confidence: ConfidenceConfirmed, Evidence: []string{"composer.lock"}}}},
+		{"lockfile confirms conan", []string{"conan.lock"}, []ManagerCandidate{{ID: "conan", Confidence: ConfidenceConfirmed, Evidence: []string{"conan.lock"}}}},
+		{"lockfile confirms helm", []string{"Chart.lock"}, []ManagerCandidate{{ID: "helm", Confidence: ConfidenceConfirmed, Evidence: []string{"Chart.lock"}}}},
+		{"lockfile confirms mix", []string{"mix.lock"}, []ManagerCandidate{{ID: "mix", Confidence: ConfidenceConfirmed, Evidence: []string{"mix.lock"}}}},
+		{"lockfile confirms nuget", []string{"packages.lock.json"}, []ManagerCandidate{{ID: "nuget", Confidence: ConfidenceConfirmed, Evidence: []string{"packages.lock.json"}}}},
+		{"lockfile confirms pdm", []string{"pdm.lock"}, []ManagerCandidate{{ID: "pdm", Confidence: ConfidenceConfirmed, Evidence: []string{"pdm.lock"}}}},
+		{"lockfile confirms pub", []string{"pubspec.lock"}, []ManagerCandidate{{ID: "pub", Confidence: ConfidenceConfirmed, Evidence: []string{"pubspec.lock"}}}},
+		{"lockfile confirms swift", []string{"Package.resolved"}, []ManagerCandidate{{ID: "swift", Confidence: ConfidenceConfirmed, Evidence: []string{"Package.resolved"}}}},
+		{"lockfile confirms terraform", []string{".terraform.lock.hcl"}, []ManagerCandidate{{ID: "terraform", Confidence: ConfidenceConfirmed, Evidence: []string{".terraform.lock.hcl"}}}},
+		{"manifest infers bundler", []string{"Gemfile"}, []ManagerCandidate{{ID: "bundler", Confidence: ConfidenceInferred, Evidence: []string{"Gemfile"}}}},
+		{"manifest infers cargo", []string{"Cargo.toml"}, []ManagerCandidate{{ID: "cargo", Confidence: ConfidenceInferred, Evidence: []string{"Cargo.toml"}}}},
+		{"manifest infers cmake", []string{"CMakeLists.txt"}, []ManagerCandidate{{ID: "cmake", Confidence: ConfidenceInferred, Evidence: []string{"CMakeLists.txt"}}}},
+		{"manifest infers composer", []string{"composer.json"}, []ManagerCandidate{{ID: "composer", Confidence: ConfidenceInferred, Evidence: []string{"composer.json"}}}},
+		{"manifest infers conan", []string{"conanfile.py"}, []ManagerCandidate{{ID: "conan", Confidence: ConfidenceInferred, Evidence: []string{"conanfile.py"}}}},
+		{"manifest infers gradle", []string{"build.gradle"}, []ManagerCandidate{{ID: "gradle", Confidence: ConfidenceInferred, Evidence: []string{"build.gradle"}}}},
+		{"manifest infers maven", []string{"pom.xml"}, []ManagerCandidate{{ID: "maven", Confidence: ConfidenceInferred, Evidence: []string{"pom.xml"}}}},
+		{"manifest infers mix", []string{"mix.exs"}, []ManagerCandidate{{ID: "mix", Confidence: ConfidenceInferred, Evidence: []string{"mix.exs"}}}},
+		{"manifest infers pub", []string{"pubspec.yaml"}, []ManagerCandidate{{ID: "pub", Confidence: ConfidenceInferred, Evidence: []string{"pubspec.yaml"}}}},
+		{"manifest infers rustup", []string{"rust-toolchain.toml"}, []ManagerCandidate{{ID: "rustup", Confidence: ConfidenceInferred, Evidence: []string{"rust-toolchain.toml"}}}},
+		{"manifest infers swift", []string{"Package.swift"}, []ManagerCandidate{{ID: "swift", Confidence: ConfidenceInferred, Evidence: []string{"Package.swift"}}}},
 		{"pyproject alone is ambiguous", []string{"pyproject.toml"}, []ManagerCandidate{
 			{ID: "pdm", Confidence: ConfidenceAmbiguous, Evidence: []string{"pyproject.toml"}},
 			{ID: "pip", Confidence: ConfidenceAmbiguous, Evidence: []string{"pyproject.toml"}},
@@ -104,6 +125,7 @@ func TestResolveManagersConflictVariants(t *testing.T) {
 		{"npm and yarn lockfiles", []string{"yarn.lock", "package-lock.json"}, []string{"npm", "yarn"}, "lockfiles evidence distinct managers: npm and yarn"},
 		{"poetry and uv lockfiles", []string{"poetry.lock", "uv.lock"}, []string{"poetry", "uv"}, "lockfiles evidence distinct managers: poetry and uv"},
 		{"deno and pnpm lockfiles", []string{"deno.lock", "pnpm-lock.yaml"}, []string{"deno", "pnpm"}, "lockfiles evidence distinct managers: deno and pnpm"},
+		{"pdm and poetry lockfiles", []string{"pdm.lock", "poetry.lock"}, []string{"pdm", "poetry"}, "lockfiles evidence distinct managers: pdm and poetry"},
 		{"gradle and maven wrappers", []string{"mvnw", "gradlew"}, []string{"gradle", "maven"}, "project wrappers evidence distinct managers: gradle and maven"},
 	}
 	for _, tt := range tests {
@@ -130,6 +152,7 @@ func TestResolveManagersFamilyEvidencePrecedence(t *testing.T) {
 		want  []ManagerCandidate
 	}{
 		{"pyproject plus uv lockfile confirms only uv", []string{"pyproject.toml", "uv.lock"}, []ManagerCandidate{{ID: "uv", Confidence: ConfidenceConfirmed, Evidence: []string{"uv.lock"}}}},
+		{"pdm lockfile confirms pdm over pyproject", []string{"pyproject.toml", "pdm.lock"}, []ManagerCandidate{{ID: "pdm", Confidence: ConfidenceConfirmed, Evidence: []string{"pdm.lock"}}}},
 		{"package.json plus yarn lockfile confirms only yarn", []string{"package.json", "yarn.lock"}, []ManagerCandidate{{ID: "yarn", Confidence: ConfidenceConfirmed, Evidence: []string{"yarn.lock"}}}},
 		{"deno manifest with package.json keeps JS ambiguous", []string{"package.json", "deno.json"}, []ManagerCandidate{
 			{ID: "bun", Confidence: ConfidenceAmbiguous, Evidence: []string{"package.json"}},
@@ -146,6 +169,27 @@ func TestResolveManagersFamilyEvidencePrecedence(t *testing.T) {
 				t.Fatalf("candidates:\ngot  %s\nwant %s", fmt.Sprint(candidates), fmt.Sprint(tt.want))
 			}
 		})
+	}
+}
+
+func TestResolveManagersFamiliesIndependent(t *testing.T) {
+	// composer.lock and Cargo.lock confirm managers within their own
+	// ecosystems; distinct ecosystems never produce a cross-ecosystem conflict.
+	candidates, conflicts := resolveManagers([]string{"composer.lock", "Cargo.lock", "Gemfile.lock", "mix.lock", "pubspec.lock", "conan.lock", "packages.lock.json", ".terraform.lock.hcl"})
+	got := map[string]string{}
+	for _, c := range candidates {
+		got[c.ID] = c.Confidence
+	}
+	want := map[string]string{
+		"bundler": ConfidenceConfirmed, "cargo": ConfidenceConfirmed, "composer": ConfidenceConfirmed,
+		"conan": ConfidenceConfirmed, "mix": ConfidenceConfirmed, "nuget": ConfidenceConfirmed,
+		"pub": ConfidenceConfirmed, "terraform": ConfidenceConfirmed,
+	}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("families:\ngot  %v\nwant %v", got, want)
+	}
+	if len(conflicts) != 0 {
+		t.Fatalf("cross-ecosystem managers must not conflict: %v", conflicts)
 	}
 }
 

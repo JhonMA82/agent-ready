@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -148,6 +149,62 @@ func TestInspectPrunesHeavyTreesAndRetainsPresence(t *testing.T) {
 	beforeJSON, _ := json.Marshal(before)
 	afterJSON, _ := json.Marshal(after)
 	if string(beforeJSON) != string(afterJSON) {
+		t.Fatalf("heavy-tree descendant changed facts:\nbefore %s\nafter  %s", beforeJSON, afterJSON)
+	}
+}
+
+func TestHeavyTreePresenceOnly(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "main.go", "package main\n")
+	write(t, root, "src/app.go", "package src\n")
+	dirs := []string{
+		".dart_tool", ".next", ".nuxt", ".venv", "__pycache__", "_build", "bin",
+		"build", "coverage", "deps", "dist", "node_modules", "obj", "out",
+		"result", "storage/logs", "target", "vendor", "venv",
+	}
+	for _, dir := range dirs {
+		write(t, root, dir+"/nested/deep/ignored.txt", "ignored\n")
+	}
+	write(t, root, "cmake-build-debug/CMakeCache.txt", "cache\n")
+	// OQ-3: PHP bin/console stays pruned, but bin presence signal is retained.
+	write(t, root, "bin/console", "#!/usr/bin/env php\n")
+
+	before, err := Inspect(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantDirs := append([]string(nil), dirs...)
+	wantDirs = append(wantDirs, "cmake-build-debug")
+	sort.Strings(wantDirs)
+	wantPresence := make([]Presence, len(wantDirs))
+	for i, dir := range wantDirs {
+		wantPresence[i] = Presence{Path: dir, Kind: "directory"}
+	}
+	if got, want := fmt.Sprint(before.Presence), fmt.Sprint(wantPresence); got != want {
+		t.Fatalf("presence:\ngot  %s\nwant %s", got, want)
+	}
+	if got, want := fmt.Sprint(before.Files), fmt.Sprint(Files{Total: 2, ByExtension: map[string]int{"go": 2}}); got != want {
+		t.Fatalf("heavy-tree descendants counted:\ngot  %s\nwant %s", got, want)
+	}
+	paths, err := Paths(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := fmt.Sprint(paths), fmt.Sprint([]string{"main.go", "src/app.go"}); got != want {
+		t.Fatalf("paths include heavy-tree descendants:\ngot  %s\nwant %s", got, want)
+	}
+
+	// Descendant changes must not change any fact (spec scenario "Heavy tree is present").
+	write(t, root, "dist/assets/app.js", "changed\n")
+	write(t, root, "node_modules/pkg/index.js", "changed\n")
+	write(t, root, ".next/server/app.js", "changed\n")
+	write(t, root, "storage/logs/laravel.log", "changed\n")
+	after, err := Inspect(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeJSON, _ := json.Marshal(before)
+	if afterJSON, _ := json.Marshal(after); string(beforeJSON) != string(afterJSON) {
 		t.Fatalf("heavy-tree descendant changed facts:\nbefore %s\nafter  %s", beforeJSON, afterJSON)
 	}
 }

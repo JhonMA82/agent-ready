@@ -133,6 +133,21 @@ func TestFullLockfileCoverage(t *testing.T) {
 	}
 }
 
+func TestCargoInlineTableVersion(t *testing.T) {
+	// Regression: cargoDepRe must match the inline-table alternative
+	// `name = { version = "..." }` (stray 0x08 byte previously killed it).
+	root := t.TempDir()
+	write(t, root, "Cargo.toml", "[package]\nname = \"demo\"\n\n[dependencies]\nratatui = { version = \"0.29.0\", features = [\"crossterm\"] }\nserde = { version = \"1.0.0\" }\n")
+	write(t, root, "src/main.rs", "fn main() {}\n")
+	got := Detect(root, []string{"Cargo.toml", "src/main.rs"})
+	if len(got.FrameworkFacts) != 1 || got.FrameworkFacts[0].Name != "ratatui" || got.FrameworkFacts[0].Version != "0.29.0" {
+		t.Fatalf("inline-table version not parsed: %+v", got.FrameworkFacts)
+	}
+	if got := fmt.Sprint(got.FrameworkFacts[0].Evidence); got != fmt.Sprint([]string{"Cargo.toml"}) {
+		t.Fatalf("evidence: got %s", got)
+	}
+}
+
 func TestFrameworkVersionEvidence(t *testing.T) {
 	root := t.TempDir()
 	write(t, root, "Cargo.toml", "[package]\nname = \"demo\"\n\n[dependencies]\nratatui = \"0.29.0\"\n")
