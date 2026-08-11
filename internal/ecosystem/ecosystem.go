@@ -162,12 +162,12 @@ func signals(paths []string, rules []rule) []Signal {
 		name := path.Base(source)
 		for _, rule := range rules {
 			if slices.Contains(rule.names, name) {
-				out = append(out, Signal{rule.id, source})
+				out = append(out, Signal{ID: rule.id, Path: source})
 				continue
 			}
 			for _, suffix := range rule.suffixes {
 				if strings.HasSuffix(name, suffix) {
-					out = append(out, Signal{rule.id, source})
+					out = append(out, Signal{ID: rule.id, Path: source})
 					break
 				}
 			}

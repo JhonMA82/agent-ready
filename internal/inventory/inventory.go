@@ -156,7 +156,7 @@ func collectFiles(root string) ([]string, []Presence, []ecosystem.Signal, Files,
 				rel, _ := filepath.Rel(root, path)
 				rel = filepath.ToSlash(rel)
 				if id := outputSignalID(rel, d.Name()); id != "" {
-					outputSignals = append(outputSignals, ecosystem.Signal{id, rel})
+					outputSignals = append(outputSignals, ecosystem.Signal{ID: id, Path: rel})
 				}
 				if slices.Contains(heavyTrees, d.Name()) {
 					presence = append(presence, Presence{rel, "directory"})
