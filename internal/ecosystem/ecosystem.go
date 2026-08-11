@@ -242,4 +242,4 @@ func declaredVersion(root, manifest, dep string) string {
 	return ""
 }
 
-var cargoDepRe = regexp.MustCompile(`(?m)^\s*([A-Za-z0-9_.-]+)\s*=\s*(?:"([^"]+)"|\{[^}]*version\s*=\s*"([^"]+)"[^}]*\})`)
+var cargoDepRe = regexp.MustCompile(`(?m)^\s*([A-Za-z0-9_.-]+)\s*=\s*(?:"([^"]+)"|\{[^}]*\bversion\s*=\s*"([^"]+)"[^}]*\})`)
