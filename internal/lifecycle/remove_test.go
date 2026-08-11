@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -143,4 +144,34 @@ func TestRemoveDryRunWiringZeroWrites(t *testing.T) {
 		t.Fatal("precondition: plan must reference existing paths")
 	}
 	_ = bootstrap.Desired // keep import for installDesired dependency
+}
+
+// §57/§58: remove never touches an existing global OpenCode config; the
+// isolated-HOME config stays byte-identical across the whole removal flow.
+func TestRemoveLeavesGlobalConfigUntouched(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	global := filepath.Join(home, ".config", "opencode", "opencode.json")
+	globalBytes := []byte("{\"model\":\"acme/small\"}\n")
+	if err := os.MkdirAll(filepath.Dir(global), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(global, globalBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root := removeDesired(t)
+	for _, mode := range []Mode{ModeHarnessOnly, ModeHarnessAndGen} {
+		plan, err := PlanRemove(root, mode)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := ApplyRemove(plan); err != nil {
+			t.Fatal(err)
+		}
+		if after, err := os.ReadFile(global); err != nil || !bytes.Equal(after, globalBytes) {
+			t.Fatalf("%s modified global config: %v\n%s", mode, err, after)
+		}
+		root = removeDesired(t) // fresh initialized repo per mode
+	}
 }

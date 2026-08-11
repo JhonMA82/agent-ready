@@ -119,11 +119,19 @@ func TestRecipeFiveBehaviors(t *testing.T) {
 
 // §47/§57/§58: the rtk binary install never touches global OpenCode
 // configuration and never runs the OpenCode integration (opt-in only, never
-// during install); the isolated HOME stays free of any opencode config.
+// during install); an existing global config stays byte-identical.
 func TestRtkInstallIsolatedFromGlobalOpenCode(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	global := filepath.Join(home, ".config", "opencode", "opencode.json")
+	if err := os.MkdirAll(filepath.Dir(global), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	globalBytes := []byte("{\"model\":\"acme/small\",\"skills\":{\"paths\":[\"./global-skills\"]}}\n")
+	if err := os.WriteFile(global, globalBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	log := filepath.Join(t.TempDir(), "log")
 	brewDir := fakeExecutable(t, "brew", "#!/bin/sh\nprintf '%s\\n' \"$@\" >> "+log+"\n")
 	rtkDir := fakeBin(t, "rtk", "rtk 0.28.2")
@@ -148,18 +156,44 @@ func TestRtkInstallIsolatedFromGlobalOpenCode(t *testing.T) {
 	if got := strings.TrimSpace(string(data)); got != "install\nrtk" {
 		t.Fatalf("install must run only `brew install rtk`, got %q", got)
 	}
-	// The isolated HOME contains no global OpenCode configuration.
-	err = filepath.WalkDir(home, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() && strings.Contains(strings.ToLower(d.Name()), "opencode") {
-			t.Fatalf("install created global config at %s", path)
-		}
-		return nil
-	})
+	// The pre-existing global OpenCode config is byte-identical.
+	after, err := os.ReadFile(global)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !bytes.Equal(after, globalBytes) {
+		t.Fatalf("global config changed by install:\ngot  %s\nwant %s", after, globalBytes)
+	}
+}
+
+// D6/§47: the separate global-integration opt-in appears only after an
+// install of an entry that declares opt-in integration (rtk), defaults to N,
+// and a Y answer without a verified integration recipe fails with explicit
+// remediation — nothing is ever written globally.
+func TestGlobalIntegrationPrompt(t *testing.T) {
+	var out bytes.Buffer
+	// Non-opt-in tools never prompt.
+	if err := GlobalIntegrationPrompt(&out, strings.NewReader("y\n"), "uv"); err != nil {
+		t.Fatalf("uv must not prompt or error: %v", err)
+	}
+	if out.String() != "" {
+		t.Fatalf("uv must render no prompt, got %q", out.String())
+	}
+	// Default N: declining leaves global configuration untouched.
+	for _, input := range []string{"n\n", "\n", ""} {
+		out.Reset()
+		if err := GlobalIntegrationPrompt(&out, strings.NewReader(input), "rtk"); err != nil {
+			t.Fatalf("input %q must decline without error: %v", input, err)
+		}
+		if !strings.Contains(out.String(), "Enable global integration? [y/N]") {
+			t.Fatalf("input %q must render the opt-in prompt, got %q", input, out.String())
+		}
+	}
+	// Y without a verified recipe -> explicit remediation, nothing modified.
+	out.Reset()
+	err := GlobalIntegrationPrompt(&out, strings.NewReader("y\n"), "rtk")
+	if err == nil || !strings.Contains(err.Error(), "no verified OpenCode integration recipe") || !strings.Contains(err.Error(), "remediation") || !strings.Contains(err.Error(), "nothing was modified") {
+		t.Fatalf("Y must fail with remediation: %v", err)
 	}
 }
 

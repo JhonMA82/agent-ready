@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -58,6 +59,12 @@ func Doctor(root string) (DoctorFacts, error) {
 	}
 	facts.Checks = append(facts.Checks, recipeCheck)
 	facts.Checks = append(facts.Checks, integrationChecks(root)...)
+	facts.Checks = append(facts.Checks, providerChecks(root)...)
+	for _, check := range facts.Checks {
+		if check.Status == "fail" {
+			facts.Healthy = false
+		}
+	}
 	return facts, nil
 }
 
@@ -95,6 +102,60 @@ func integrationChecks(root string) []DoctorCheck {
 	checks = append(checks, config)
 	return checks
 }
+
+// providerProbe is the §49 doctor probe table: read-only executable and
+// version probes per provider, plus which providers require a project index.
+// Providers declare no install contract in V1; probing never implies support.
+var providerProbe = []struct {
+	id            string
+	versionArgs   []string
+	requiresIndex bool
+}{
+	{id: "codegraph", versionArgs: []string{"--version"}, requiresIndex: true},
+	{id: "context7", versionArgs: []string{"--version"}},
+	{id: "headroom", versionArgs: []string{"--version"}},
+	{id: "semble", versionArgs: []string{"--version"}},
+	{id: "serena", versionArgs: []string{"--version"}},
+}
+
+// providerChecks runs the §49 per-provider checks: executable exists, version
+// parses, project index/config exists when required, OpenCode integration is
+// detectable when enabled, and provider health when inexpensive. Providers
+// are never auto-installed, so absence is a warning; a broken version or a
+// missing required index is a failure with a reason — a provider is never
+// reported healthy merely because a binary exists.
+func providerChecks(root string) []DoctorCheck {
+	var checks []DoctorCheck
+	for _, p := range providerProbe {
+		check := DoctorCheck{Name: "provider:" + p.id, Status: "ok", Detail: "executable+version ok"}
+		if path, err := exec.LookPath(p.id); err != nil {
+			check.Status, check.Detail = "warning", "not installed (providers are never auto-installed)"
+		} else {
+			out, _ := exec.Command(path, p.versionArgs...).Output()
+			if version := providerVersionRE.FindString(string(out)); version == "" {
+				check.Status, check.Detail = "fail", "version check failed: executable exists but its version does not parse: "+strings.TrimSpace(string(out))
+			} else {
+				check.Detail = "version " + version
+			}
+			if check.Status == "ok" && p.requiresIndex {
+				if _, err := os.Stat(filepath.Join(root, ".codegraph")); err != nil {
+					check.Status, check.Detail = "fail", "project index missing at .codegraph/ (remediation: run codegraph init)"
+				} else {
+					check.Detail += "; project index present"
+				}
+			}
+			if check.Status == "ok" {
+				check.Detail += "; integration unsupported in V1; health covered by executable/version/index checks"
+			}
+		}
+		checks = append(checks, check)
+	}
+	return checks
+}
+
+// providerVersionRE is the §49 version parse: a x.y.z token; version output
+// without one fails the check (never healthy merely because a binary exists).
+var providerVersionRE = regexp.MustCompile(`\bv?[0-9]+\.[0-9]+\.[0-9]+\b`)
 
 // Summary renders the compact default output.
 func (f DoctorFacts) Summary() string {

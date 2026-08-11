@@ -30,8 +30,8 @@ func TestEmbeddedRecipesUnchanged(t *testing.T) {
 
 func TestCatalogOrderedSupportTruth(t *testing.T) {
 	catalog := Catalog()
-	if len(catalog) != 36 {
-		t.Fatalf("expected 36 catalog entries, got %d", len(catalog))
+	if len(catalog) != 38 {
+		t.Fatalf("expected 38 catalog entries, got %d", len(catalog))
 	}
 	for i := 1; i < len(catalog); i++ {
 		if catalog[i-1].ID >= catalog[i].ID {
@@ -58,6 +58,33 @@ func TestCatalogOrderedSupportTruth(t *testing.T) {
 			if op.Executable != pm || len(op.Args) == 0 {
 				t.Fatalf("%s %s recipe must execute %s deterministically with fixed args, got %+v", entry.ID, pm, pm, op)
 			}
+		}
+	}
+	// §14/§48: the five providers declare their capability ids and the six
+	// metadata fields; install stays unsupported without a verified recipe.
+	want := map[string][]string{
+		"codegraph": {"dependency_graph", "call_graph", "blast_radius", "architecture_query"},
+		"context7":  {"versioned_documentation"},
+		"headroom":  {"general_context_compression"},
+		"semble":    {"semantic_retrieval"},
+		"serena":    {"symbol_intelligence", "semantic_navigation", "symbolic_editing"},
+	}
+	for _, id := range []string{"codegraph", "context7", "headroom", "semble", "serena"} {
+		entry := entryByID(t, id)
+		meta := entry.Provider
+		if entry.Family != FamilyProvider || entry.Capabilities.Install != Unsupported || entry.Install != nil || meta == nil {
+			t.Fatalf("%s provider truth: %+v", id, entry)
+		}
+		for _, value := range []string{meta.InstallMethod, meta.ProjectInit, meta.IntegrationMode, meta.SideEffects, meta.Uninstall, meta.Health} {
+			if value == "" {
+				t.Fatalf("%s §48 metadata must declare all six fields: %+v", id, meta)
+			}
+		}
+		if strings.Join(entry.CapabilityIDs, ",") != strings.Join(want[id], ",") {
+			t.Fatalf("%s capability ids: %v, want %v", id, entry.CapabilityIDs, want[id])
+		}
+		if _, err := Plan(id); err == nil || !strings.Contains(err.Error(), "no verified install recipe") {
+			t.Fatalf("%s must have no install recipe: %v", id, err)
 		}
 	}
 }
@@ -218,7 +245,7 @@ func TestDetectEcosystemTools(t *testing.T) {
 		}
 	}
 	// Provider entries have no executable contract: never present.
-	for _, id := range []string{"codegraph", "context7", "semble"} {
+	for _, id := range []string{"codegraph", "context7", "headroom", "semble", "serena"} {
 		entry := entryByID(t, id)
 		if present, _ := detect(entry); present {
 			t.Fatalf("provider %s must never be detected", id)
@@ -282,7 +309,7 @@ func TestStatusFamiliesOrderedAndStable(t *testing.T) {
 	want := [][]string{
 		{"bun", "bundle", "cargo", "cmake", "composer", "conan", "dart", "deno", "dotnet", "flutter", "gh", "go", "gradle", "maven", "mix", "nix", "node", "npm", "pdm", "pip", "pipenv", "pnpm", "poetry", "rustup", "terraform", "tofu", "uv", "yarn"},
 		{"ast-grep", "fd", "jq", "rg", "rtk"},
-		{"codegraph", "context7", "semble"},
+		{"codegraph", "context7", "headroom", "semble", "serena"},
 	}
 	if len(first.Families) != 3 {
 		t.Fatalf("expected 3 families, got %d", len(first.Families))
@@ -391,5 +418,23 @@ func TestV1ReaderCompatibility(t *testing.T) {
 	jq := v1.Tools["jq"]
 	if jq.RecipeID != "jq" || !jq.Present || !strings.Contains(jq.Version, "jq-1.7.1") {
 		t.Fatalf("V1 jq facts: %+v", jq)
+	}
+}
+
+// Scenario: policy content is not hardcoded — status JSON carries no
+// recommendation verdicts or thresholds for any provider.
+func TestStatusJSONHasNoProviderVerdicts(t *testing.T) {
+	status, err := Status()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(status)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{"verdict", "threshold", ">=", "deps>", "files>"} {
+		if strings.Contains(string(data), token) {
+			t.Fatalf("status JSON must not contain %q: %s", token, data)
+		}
 	}
 }

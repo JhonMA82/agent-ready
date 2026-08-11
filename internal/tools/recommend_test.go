@@ -86,8 +86,11 @@ func TestRecommendGroundedOrderAndStability(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantCaps := []string{"token_optimized_shell", "github_context", "dependency_graph", "go_toolchain", "javascript_toolchain", "versioned_documentation", "package_manager_conflict"}
-	wantIDs := []string{"rtk", "gh", "codegraph", "go", "node", "context7", "context7"}
+	// D3: lockfile-only Context7 candidates are gone; D4 keeps workspace
+	// topology (CodeGraph), LSP surface + module boundaries (Serena), and
+	// output pressure (RTK + Headroom) as the provider signals.
+	wantCaps := []string{"token_optimized_shell", "github_context", "dependency_graph", "go_toolchain", "javascript_toolchain", "symbol_intelligence", "general_context_compression"}
+	wantIDs := []string{"rtk", "gh", "codegraph", "go", "node", "serena", "headroom"}
 	if len(first.Candidates) != len(wantCaps) {
 		t.Fatalf("expected %d candidates, got %d: %+v", len(wantCaps), len(first.Candidates), first.Candidates)
 	}
@@ -101,6 +104,9 @@ func TestRecommendGroundedOrderAndStability(t *testing.T) {
 	}
 	if !strings.Contains(first.Candidates[2].Observed, "pnpm-workspace.yaml") {
 		t.Fatalf("CodeGraph observed must cite the workspace signal: %+v", first.Candidates[2])
+	}
+	if !strings.Contains(first.Candidates[5].Observed, "go") || !strings.Contains(first.Candidates[5].Observed, "workspace_signals") {
+		t.Fatalf("Serena observed must cite LSP surface and module boundaries: %+v", first.Candidates[5])
 	}
 	data, err := json.Marshal(first)
 	if err != nil {
@@ -119,7 +125,9 @@ func TestRecommendGroundedOrderAndStability(t *testing.T) {
 	}
 }
 
-func TestRecommendConflictAwareEvidence(t *testing.T) {
+// D3: lockfile presence and manager conflicts alone never generate Context7
+// candidates — only central framework facts with a parsed version do.
+func TestRecommendLockfileOnlyNoContext7(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "pnpm-lock.yaml", "lockfileVersion: '9'\n")
 	writeFile(t, root, "bun.lock", "lockfileVersion: 1\n")
@@ -127,27 +135,13 @@ func TestRecommendConflictAwareEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(facts.Candidates) != 2 {
-		t.Fatalf("expected 2 candidates (documentation + conflict), got %+v", facts.Candidates)
-	}
-	conflict := facts.Candidates[1]
-	if conflict.Capability != "package_manager_conflict" || conflict.CatalogID != "context7" {
-		t.Fatalf("conflict candidate: %+v", conflict)
-	}
-	if !strings.Contains(conflict.Observed, "bun") || !strings.Contains(conflict.Observed, "pnpm") {
-		t.Fatalf("conflict observed must name both managers: %+v", conflict)
-	}
-	if conflict.Capabilities.Install != Unsupported || conflict.Capabilities.Configure != Unsupported {
-		t.Fatalf("provider lifecycle must stay unsupported: %+v", conflict.Capabilities)
-	}
-	data, err := json.Marshal(facts)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, token := range []string{"preferred", "primary", "selected"} {
-		if strings.Contains(string(data), token) {
-			t.Fatalf("conflict output must not choose a manager (%q): %s", token, data)
+	for _, candidate := range facts.Candidates {
+		if candidate.CatalogID == "context7" {
+			t.Fatalf("lockfile-only must not fire Context7 (D3): %+v", facts.Candidates)
 		}
+	}
+	if len(facts.Candidates) != 0 {
+		t.Fatalf("lockfile-only repository must have no candidates: %+v", facts.Candidates)
 	}
 }
 
@@ -195,25 +189,25 @@ func TestRecommendDetectOnlyTools(t *testing.T) {
 	}
 }
 
-func TestRecommendProviderWithoutLifecycle(t *testing.T) {
+// D3 scenario: a central version-sensitive framework (ratatui 0.29.0) with a
+// proposed-artifact-relevant API produces a Context7 candidate carrying
+// catalog-truth capabilities and no lifecycle support.
+func TestRecommendContext7FrameworkGated(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, root, "package-lock.json", "{}\n")
+	writeFile(t, root, "Cargo.toml", "[package]\nname = \"demo\"\n\n[dependencies]\nratatui = \"0.29.0\"\n")
+	writeFile(t, root, "src/main.rs", "use ratatui::Frame;\nfn main() {}\n")
 	facts, err := Recommend(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(facts.Candidates) != 1 || facts.Candidates[0].CatalogID != "context7" {
+	if len(facts.Candidates) != 1 {
 		t.Fatalf("expected one context7 candidate: %+v", facts.Candidates)
 	}
-	got := *facts.Candidates[0].Capabilities
-	want := entryByID(t, "context7").Capabilities
-	if got != want {
-		t.Fatalf("candidate capabilities must match catalog truth: %+v vs %+v", got, want)
-	}
-	for _, state := range []CapabilityState{got.Install, got.Configure, got.Integration, got.SideEffects} {
-		if state != Unsupported {
-			t.Fatalf("provider lifecycle must remain unsupported: %+v", got)
-		}
+	got := facts.Candidates[0]
+	caps := *got.Capabilities
+	if got.CatalogID != "context7" || got.Capability != "versioned_documentation" || !strings.Contains(got.Observed, "ratatui 0.29.0") ||
+		caps != entryByID(t, "context7").Capabilities || caps.Install != Unsupported || caps.Configure != Unsupported || caps.Integration != Unsupported {
+		t.Fatalf("context7 candidate must carry catalog truth without lifecycle: %+v", got)
 	}
 }
 
@@ -244,7 +238,67 @@ func TestRecommendV1ReaderCompatibility(t *testing.T) {
 	if v1.SchemaVersion != RecommendSchemaVersion {
 		t.Fatalf("schema: %s", v1.SchemaVersion)
 	}
-	if len(v1.Candidates) != 2 || v1.Candidates[0].Candidate != "go" {
+	// D3: go.sum lockfile alone no longer generates a Context7 candidate.
+	if len(v1.Candidates) != 1 || v1.Candidates[0].Candidate != "go" {
 		t.Fatalf("V1 fields lost: %+v", v1.Candidates)
+	}
+}
+
+// D4: provider signals stay conditional — CodeGraph needs workspace topology
+// (never a deps>N verdict), Semble the documented §14.3 scale band, and a
+// small single-crate repository stays free of provider candidates.
+func TestRecommendD4ConditionalProviderSignals(t *testing.T) {
+	depsJSON := "{\"dependencies\":{"
+	for i := 0; i < 60; i++ {
+		depsJSON += "\"dep" + strconv.Itoa(i) + "\":\"1.0.0\","
+	}
+	depsJSON = strings.TrimSuffix(depsJSON, ",") + "}}\n"
+	root := t.TempDir()
+	writeFile(t, root, "package.json", depsJSON)
+	facts, err := Recommend(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	semble := false
+	for _, candidate := range facts.Candidates {
+		switch candidate.CatalogID {
+		case "semble":
+			semble = true
+			if !strings.Contains(candidate.Observed, "deps=60") || candidate.Capability != "semantic_retrieval" {
+				t.Fatalf("semble scale evidence: %+v", candidate)
+			}
+		case "codegraph":
+			t.Fatalf("deps>N must not fire CodeGraph without workspace topology: %+v", facts.Candidates)
+		}
+	}
+	if !semble {
+		t.Fatalf("60-dependency repository must meet the scale band: %+v", facts.Candidates)
+	}
+	writeFile(t, root, "pnpm-workspace.yaml", "packages:\n  - packages/*\n")
+	facts, err = Recommend(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, candidate := range facts.Candidates {
+		if candidate.CatalogID == "codegraph" && strings.Contains(candidate.Observed, "pnpm-workspace.yaml") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("workspace topology must fire CodeGraph: %+v", facts.Candidates)
+	}
+	small := t.TempDir()
+	writeFile(t, small, "Cargo.toml", "[package]\nname = \"small\"\n")
+	writeFile(t, small, "src/main.rs", "fn main() {}\n")
+	facts, err = Recommend(small)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range facts.Candidates {
+		switch candidate.CatalogID {
+		case "codegraph", "context7", "headroom", "semble", "serena":
+			t.Fatalf("small repository must not fire provider candidates: %+v", facts.Candidates)
+		}
 	}
 }

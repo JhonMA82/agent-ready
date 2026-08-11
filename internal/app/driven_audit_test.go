@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
@@ -137,6 +138,15 @@ func TestDrivenAudit(t *testing.T) {
 		"XDG_STATE_HOME="+filepath.Join(home, ".local", "state"),
 		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
 	)
+	// §57: seed a global OpenCode config; init must leave it byte-identical.
+	global := filepath.Join(home, ".config", "opencode", "opencode.json")
+	globalBytes := []byte("{\"model\":\"acme/small\"}\n")
+	if err := os.MkdirAll(filepath.Dir(global), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(global, globalBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	repo := filepath.Join(base, "repo")
 	copyFixture(t, filepath.Join("testdata", "acceptance", "driven", "audit"), repo)
@@ -148,6 +158,9 @@ func TestDrivenAudit(t *testing.T) {
 	}
 	if out, code := runCommand(t, binary, repo, env, "init", "--json"); code != 0 {
 		t.Fatalf("init: code=%d %s", code, out)
+	}
+	if after, err := os.ReadFile(global); err != nil || !bytes.Equal(after, globalBytes) {
+		t.Fatalf("init modified the global OpenCode config: %v\n%s", err, after)
 	}
 	baseline := snapshot(t, repo)
 

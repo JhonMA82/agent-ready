@@ -156,6 +156,31 @@ func ConfirmConsent(r io.Reader, plan InstallPlan) (bool, error) {
 	return answer == "y" || answer == "yes", nil
 }
 
+// GlobalIntegrationPrompt asks the separate §47 opt-in question after a
+// successful binary install, but only when the entry declares an opt-in
+// OpenCode integration (rtk). The default is N and declining leaves global
+// configuration untouched. A Y answer without a verified integration recipe
+// fails with explicit remediation; the harness never writes global config
+// directly. The prompt never appears during init — init has no install path.
+func GlobalIntegrationPrompt(w io.Writer, r io.Reader, toolID string) error {
+	for _, entry := range Catalog() {
+		if entry.ID != toolID || entry.IntegrationMode != "opt-in" {
+			continue
+		}
+		fmt.Fprint(w, "Enable global integration? [y/N] ")
+		var answer string
+		if _, err := fmt.Fscanln(r, &answer); err != nil {
+			return nil // unreadable or empty input declines
+		}
+		answer = strings.ToLower(strings.TrimSpace(answer))
+		if answer != "y" && answer != "yes" {
+			return nil
+		}
+		return fmt.Errorf("no verified OpenCode integration recipe for %q in V1 (remediation: %s stays usable explicitly — e.g. %s status; nothing was modified)", toolID, toolID, toolID)
+	}
+	return nil
+}
+
 // Summary renders the compact default output.
 func (p InstallPlan) Summary() string {
 	return fmt.Sprintf("Install %s: %s %s (PM: %s)", p.Tool, p.Executable, strings.Join(p.Args, " "), p.PM)
