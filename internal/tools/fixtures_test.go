@@ -101,6 +101,15 @@ func TestBoilerplateOracle(t *testing.T) {
 	if got := inspect.Files.ByExtension["md"]; got < 2 {
 		t.Fatalf("extension-point and template markers must be inventoried: %+v", inspect.Files)
 	}
+	if !containsPath(inspect.ExtensionPoints, "extension-points.md") {
+		t.Fatalf("extension points must be emitted as facts: %+v", inspect)
+	}
+	if !containsPath(inspect.GeneratedFiles, "generated/models.g.dart") {
+		t.Fatalf("generated marker must be emitted as a fact: %+v", inspect)
+	}
+	if !containsPath(inspect.EditableFiles, "lib/main.dart") {
+		t.Fatalf("editable marker must be emitted as a fact: %+v", inspect)
+	}
 	pubInferred := false
 	for _, m := range inspect.PackageManagers {
 		pubInferred = pubInferred || m.ID == "pub" && m.Confidence == "inferred"
@@ -114,4 +123,13 @@ func TestBoilerplateOracle(t *testing.T) {
 			t.Fatalf("boilerplate facts contain decision token %q", forbidden)
 		}
 	}
+}
+
+func containsPath(paths []string, want string) bool {
+	for _, path := range paths {
+		if path == want {
+			return true
+		}
+	}
+	return false
 }

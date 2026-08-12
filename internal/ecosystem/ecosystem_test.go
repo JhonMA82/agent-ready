@@ -133,6 +133,24 @@ func TestFullLockfileCoverage(t *testing.T) {
 	}
 }
 
+func TestManifestEcosystemMatrix(t *testing.T) {
+	tests := []struct {
+		path string
+		id   string
+	}{
+		{"composer.json", "php"}, {"Cargo.toml", "rust"}, {"flake.nix", "nix"},
+		{"pubspec.yaml", "dart"}, {"Package.swift", "swift"}, {"Dockerfile", "docker"},
+		{"Chart.yaml", "helm"}, {"kustomization.yaml", "kustomize"}, {"ansible.cfg", "ansible"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			if got := Detect("", []string{tt.path}); len(got.Ecosystems) != 1 || got.Ecosystems[0].ID != tt.id {
+				t.Fatalf("ecosystem for %s: got %+v, want %s", tt.path, got.Ecosystems, tt.id)
+			}
+		})
+	}
+}
+
 func TestCargoInlineTableVersion(t *testing.T) {
 	// Regression: cargoDepRe must match the inline-table alternative
 	// `name = { version = "..." }` (stray 0x08 byte previously killed it).
@@ -159,5 +177,17 @@ func TestFrameworkVersionEvidence(t *testing.T) {
 	want := []FrameworkFact{{Name: "django", Evidence: []string{"manage.py"}, CentralitySignals: []Signal{{ID: "django", Path: "views.py"}}}, {Name: "ratatui", Version: "0.29.0", Evidence: []string{"Cargo.toml"}, CentralitySignals: []Signal{{ID: "ratatui", Path: "src/ui.rs"}}}}
 	if fmt.Sprint(got.FrameworkFacts) != fmt.Sprint(want) {
 		t.Fatalf("framework facts:\ngot  %s\nwant %s", fmt.Sprint(got.FrameworkFacts), fmt.Sprint(want))
+	}
+}
+
+func TestFrameworkVersionAbsentRetainsEvidence(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "package.json", `{"dependencies":{"next":{}}}`)
+	got := Detect(root, []string{"package.json"})
+	if len(got.FrameworkFacts) != 1 || got.FrameworkFacts[0].Name != "nextjs" || got.FrameworkFacts[0].Version != "" {
+		t.Fatalf("framework without version was dropped: %+v", got.FrameworkFacts)
+	}
+	if fmt.Sprint(got.FrameworkFacts[0].Evidence) != fmt.Sprint([]string{"package.json"}) {
+		t.Fatalf("framework evidence: %v", got.FrameworkFacts[0].Evidence)
 	}
 }

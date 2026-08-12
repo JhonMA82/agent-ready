@@ -39,6 +39,14 @@ type Presence struct {
 	Kind string `json:"kind"`
 }
 
+// BoilerplateFacts records explicit extension and generated/editable markers.
+// Paths are repository-relative and sorted; empty collections stay omitted.
+type BoilerplateFacts struct {
+	ExtensionPoints []string `json:"extension_points,omitempty"`
+	GeneratedFiles  []string `json:"generated_files,omitempty"`
+	EditableFiles   []string `json:"editable_files,omitempty"`
+}
+
 // Facts is the agent-ready.inspect/v1 schema; slices and map keys are sorted.
 type Facts struct {
 	SchemaVersion string     `json:"schema_version"`
@@ -52,6 +60,7 @@ type Facts struct {
 	Presence      []Presence `json:"presence,omitempty"`
 	ecosystem.Facts
 	OutputSignals []ecosystem.Signal `json:"output_signals,omitempty"`
+	BoilerplateFacts
 }
 
 var manifests = []struct {
@@ -155,11 +164,45 @@ func Inspect(root, invocation string) (Facts, error) {
 	})
 	sort.Slice(scripts, func(i, j int) bool { return scripts[i].Name < scripts[j].Name })
 	sort.Strings(workspaces)
-	facts := Facts{SchemaVersion: SchemaVersion, Root: root, Deps: deps, Scripts: scripts, Workspaces: workspaces, Files: files, CI: findCI(paths), Presence: presence, OutputSignals: outputSignals, Facts: ecosystem.Detect(root, paths)}
+	facts := Facts{SchemaVersion: SchemaVersion, Root: root, Deps: deps, Scripts: scripts, Workspaces: workspaces, Files: files, CI: findCI(paths), Presence: presence, OutputSignals: outputSignals, Facts: ecosystem.Detect(root, paths), BoilerplateFacts: collectBoilerplateFacts(root, paths)}
 	if invocation != "" && invocation != root {
 		facts.Invocation = invocation
 	}
 	return facts, nil
+}
+
+func collectBoilerplateFacts(root string, paths []string) BoilerplateFacts {
+	facts := BoilerplateFacts{}
+	for _, rel := range paths {
+		lower := strings.ToLower(rel)
+		if strings.Contains(lower, "extension-point") || strings.Contains(lower, "extension_points") {
+			facts.ExtensionPoints = append(facts.ExtensionPoints, rel)
+		}
+		if generatedPath(rel) {
+			facts.GeneratedFiles = append(facts.GeneratedFiles, rel)
+		}
+	}
+	if len(facts.ExtensionPoints) == 0 && len(facts.GeneratedFiles) == 0 {
+		return facts
+	}
+	for _, rel := range paths {
+		if slices.Contains(facts.GeneratedFiles, rel) {
+			continue
+		}
+		lower := strings.ToLower(rel)
+		for _, dir := range []string{"app/", "apps/", "lib/", "src/", "variants/"} {
+			if strings.HasPrefix(lower, dir) {
+				facts.EditableFiles = append(facts.EditableFiles, rel)
+				break
+			}
+		}
+	}
+	return facts
+}
+
+func generatedPath(rel string) bool {
+	lower := strings.ToLower(rel)
+	return strings.HasPrefix(lower, "generated/") || strings.Contains(lower, "/generated/") || strings.HasSuffix(lower, ".g.dart") || strings.Contains(lower, ".generated.")
 }
 
 func collectFiles(root string) ([]string, []Presence, []ecosystem.Signal, Files, error) {
