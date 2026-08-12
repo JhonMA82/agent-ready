@@ -8,9 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Every entry below is cross-checked against the repository commit history; the **Covered commits** line under each release lists the commits that introduced the described behavior. Release tags follow the goreleaser `v*` filter (`goreleaser.yml` → `release`). The V1 close is additionally checkpointed by `v1.0.0-facts` and `v1.0.0-sync-contract`; the final `v1.0.0` tag marks the archived, verified release.
 
-## [Unreleased]
+## [v1.1.0] - 2026-08-12
 
-Context placement & token optimization refinement (per `OPENCODE_AGENT_READY_V1_CONTEXT_PLACEMENT_REFINEMENT.md`). Commit hashes are added on release.
+Context placement refinement (placement signals, fixtures q-u) plus the final corrective output contracts per `OPENCODE_AGENT_READY_FINAL_CONTEXT_FIX.md`: mandatory Repository Profile, Context Placement and Boilerplate Assessment evidence before REUSE/NO_ACTION.
+
+**Covered commits**: `12a1730`, `7a3f678`, `0332741`, `0cf1339`, `82cd136`, `68dad75`, `ef5c7b3`
 
 ### Added
 
@@ -20,10 +22,15 @@ Context placement & token optimization refinement (per `OPENCODE_AGENT_READY_V1_
 - **Placement and tool signals** — `inspect --json` emits the `agents_md` fact; `tools recommend --json` emits `context_placement_pressure` (AGENTS.md > 300 lines, signal only), `structured_search_need` (ast-grep), and an enriched RTK candidate fired by output dirs, build/test scripts, or CI (no longer only `dist/build/coverage`).
 - **Sync extension** — placement-change detection (AGENTS/skill/reference/canonical example), artifact-graph relations (`derived_from`/`routed_from`/`refresh_when`), placement provenance, and new tool-reassessment triggers.
 - **Regression fixtures Q–U** — tanstack-shadcn boilerplate, long AGENTS (500+ lines), short optimal AGENTS, deterministic procedure, external canonical skill.
+- **Final output contracts** — the orchestrator output contract mandates Repository Profile, Context Placement, Artifact Decisions, Tool / Capability Assessment and Checkpoint; REUSE/NO_ACTION require the Context Placement Gate, and `checkpoint --complete` is blocked when a placement verdict is missing but existing guidance informed the conclusion (`68dad75`).
+- **Verdict routing** — `artifact-design` routes all 11 verdicts (CREATE/UPDATE/REUSE/REMOVE/COMPACT/EXTRACT_TO_SKILL/MOVE_TO_REFERENCE/REPLACE_WITH_SCRIPT/REUSE_EXTERNAL_SKILL/NO_ACTION/ASK_USER); the >=85 threshold applies only to new-skill creation.
+- **Repository profile persistence** — `repository-analysis` persists `.agent-ready/state/repository-profile.yaml` (kind.primary, kind.confidence, topology) and runs the Boilerplate Assessment (extension points, editable boundaries, generated files, feature workflow, variants, scaffolding, upgrade strategy) for starter/boilerplate/template kinds; `monorepo` is topology, never a kind.
+- **Contract tests** — content tests lock the orchestrator and artifact-design contracts; the driven audit requires observable Repository + Context Placement evidence, an explicit RTK evaluation in Productivity, and persisted profile/placement/boilerplate state; the driven tanstack cohort reuses acceptance `fixture-q` without duplicating fixtures (`68dad75`).
 
 ### Changed
 
 - **Skill quality rubric** — added `context_placement` (weight 10); rebalanced to necessity 20, repository-specificity 15, discovery description 15, procedural value 15, progressive disclosure 10, evidence grounding 10, validation 5.
+- **Driven fixture reuse** — the tanstack-starter driven cohort points at acceptance `fixture-q`; long-agents/short-optimal/deterministic coverage stays in the acceptance harness (fixtures r/s/t), so example projects are not duplicated under `driven/` (`68dad75`).
 
 ## [v1.0.0] - 2026-08-11
 
