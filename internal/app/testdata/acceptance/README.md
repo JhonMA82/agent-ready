@@ -36,3 +36,13 @@ specification deferral.
 | M | isolation | no global writes; trees byte-identical | snapshot equality around read-only helpers |
 | N | tool-degradation | no Tool Manager -> capability reasoning, no block | seeded capability-reasoning record |
 | P | decision-evidence | decisions.jsonl/provenance.jsonl record every decision + rationale | seeded decisions + provenance records |
+
+## Context-placement additions (refinement §37–41)
+
+| ID | Fixture | Evidence class | Seeded evidence |
+|---|---|---|---|
+| Q | tanstack-shadcn-boilerplate | repository_kind boilerplate (extension points, generated files, scaffolding); screen-creation placement analysis (REUSE vs EXTRACT_TO_SKILL vs COMPACT); shadcn external-skill reuse, no generic React/TanStack skill; RTK on build scripts, no pressure signal (AGENTS < 300 lines) | `expect/repository-kind.md`, `expect/placement-screen-creation.md`, `expect/external-skill-reuse.md` |
+| R | long-agents | AGENTS.md 500+ lines (50 global / 150 migration / 100 release / 200 examples) -> COMPACT + EXTRACT migration + EXTRACT release + MOVE examples, router preserved; recommend emits `context_placement_pressure` (no catalog id) | `expect/placement-analysis.md` |
+| S | short-optimal-agents | ~60-line well-placed global AGENTS.md -> REUSE + NO_ACTION, no extraction by dogma, no pressure signal | `expect/placement-reuse.md` |
+| T | deterministic-procedure | deterministic procedure replaced by existing equivalent scripts (generate-routes, validate-presets) -> REPLACE_WITH_SCRIPT / COMPACT, no redundant skill | `expect/decision-replace-with-script.md` |
+| U | external-canonical-skill | capability covered by canonical external skill -> REUSE_EXTERNAL_SKILL, no local wrapper | `expect/decision-reuse-external-skill.md` |

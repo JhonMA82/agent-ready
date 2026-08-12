@@ -1,0 +1,12 @@
+{
+  "name": "external-canonical-skill-demo",
+  "private": true,
+  "scripts": {
+    "dev": "node dev.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.0",
+    "tailwind-merge": "^2.5.0"
+  }
+}

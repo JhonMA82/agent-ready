@@ -1,0 +1,4 @@
+#!/bin/sh
+# Deterministic: validates generated presets (JSON parse, id shape, sort).
+set -eu
+echo "all presets valid"

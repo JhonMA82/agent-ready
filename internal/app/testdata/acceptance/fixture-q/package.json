@@ -1,0 +1,18 @@
+{
+  "name": "tanstack-shadcn-admin-boilerplate",
+  "private": true,
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "start": "node .output/server/index.mjs",
+    "generate-routes": "node scripts/generate-routes"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "^1.57.0",
+    "@tanstack/react-start": "^1.57.0",
+    "class-variance-authority": "^0.7.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.5.0"
+  }
+}

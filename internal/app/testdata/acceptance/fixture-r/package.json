@@ -1,0 +1,9 @@
+{
+  "name": "legacy-workspace-platform",
+  "private": true,
+  "scripts": {
+    "dev": "node dev-server.js",
+    "start": "node server.js",
+    "generate": "node tools/generate-bindings.js"
+  }
+}

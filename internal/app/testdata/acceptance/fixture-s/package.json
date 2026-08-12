@@ -1,0 +1,8 @@
+{
+  "name": "short-optimal-agents-demo",
+  "private": true,
+  "scripts": {
+    "dev": "node dev.js",
+    "start": "node server.js"
+  }
+}

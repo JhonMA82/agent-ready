@@ -1,0 +1,5 @@
+#!/bin/sh
+# Deterministic: regenerates the route manifest from src/routes.
+# No semantic judgment — the audit classifies this as script-level context.
+set -eu
+echo "route manifest regenerated from src/routes"

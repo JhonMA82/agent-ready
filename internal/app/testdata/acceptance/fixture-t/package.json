@@ -1,0 +1,10 @@
+{
+  "name": "deterministic-procedure-demo",
+  "private": true,
+  "scripts": {
+    "dev": "node dev.js",
+    "start": "node server.js",
+    "generate-routes": "node scripts/generate-routes",
+    "validate-presets": "node scripts/validate-presets"
+  }
+}
