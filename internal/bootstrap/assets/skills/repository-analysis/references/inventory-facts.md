@@ -21,3 +21,35 @@ How to gather the deterministic evidence base. Read this reference when explorat
 - Record each fact with its source; helper output is identified by its schema name.
 - Never read whole files into context; extract the fact and label it.
 - Feed every successful audit's Tool / Capability Assessment: all three families with evidence and reasons, or `NO_ADDITIONAL_TOOLS` with a reason.
+
+## repository_profile contract
+
+Build the repository profile with these fields:
+
+```yaml
+repository_profile:
+  kind:
+    primary: boilerplate | starter | template | application
+    secondary: []
+    confidence: <0.0-1.0>
+  ecosystems: []
+  central_frameworks: []
+  existing_agent_assets:
+    agents_md: null | {path, lines}
+    local_skills: []
+    external_skills: []
+    scripts: []
+  context_placement:
+    always_on_estimate: <qualitative>
+    task_specific_guidance_candidates: []
+  tool_assessment:
+    ecosystem: []
+    productivity: []
+    providers: []
+```
+
+Kind and confidence are classified per the repository-analysis skill (boilerplate/starter/template trigger the boilerplate audit).
+
+## Frequency discipline
+
+Infer usage frequency from the repository when possible — always, common, occasional, rare. When it cannot be inferred, record `unknown`: never invent frequency, and record the uncertainty instead.

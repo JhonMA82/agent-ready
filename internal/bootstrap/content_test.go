@@ -11,9 +11,11 @@ import (
 )
 
 // TestSkillQualityRubricContent locks the normative rubric contract (R5): the
-// embedded skill-quality-rubric.md must declare all seven criteria with the
-// exact weights (summing to 100), the exact verdict boundaries (>=85 PASS,
-// 70-84 REVISE, <70 REJECT), and a justification-forcing scoring contract.
+// embedded skill-quality-rubric.md must declare all eight criteria with the
+// exact weights (summing to 100) — including the V1 context-placement
+// refinement rebalance (context_placement 10, necessity 20) — the exact
+// verdict boundaries (>=85 PASS, 70-84 REVISE, <70 REJECT), and a
+// justification-forcing scoring contract.
 // It also verifies the full PR2 reference set is embedded and routed to the
 // design's skill-system layout (D2).
 func TestSkillQualityRubricContent(t *testing.T) {
@@ -25,12 +27,13 @@ func TestSkillQualityRubricContent(t *testing.T) {
 	doc := string(data)
 
 	criteria := map[string]int{
-		"necessity":              25,
-		"repository_specificity": 20,
+		"necessity":              20,
+		"repository_specificity": 15,
 		"discovery_description":  15,
 		"procedural_value":       15,
 		"progressive_disclosure": 10,
 		"evidence_grounding":     10,
+		"context_placement":      10,
 		"validation":             5,
 	}
 

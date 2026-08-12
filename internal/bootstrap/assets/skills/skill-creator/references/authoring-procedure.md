@@ -23,3 +23,17 @@ CREATE ships a structured skill_request declaring: purpose, repository_evidence,
 ## DO / DON'T
 DO: state the trigger first; write imperative instructions; keep examples minimal; link local references.
 DON'T: decide necessity (decided before you run); dump repository content into context; write generic advice; exceed the hard body maximum.
+
+## Extraction procedure (EXTRACT_TO_SKILL / MOVE_TO_REFERENCE)
+
+When the approved decision moves existing guidance instead of creating from scratch:
+
+Inputs: the placement_change context — from (path and section), to (path), reason, preserved_router, source_hash.
+
+1. Read the source section in full; capture its exact semantics before moving anything.
+2. Extract only the task-specific procedure; global invariants and essential commands stay in the source.
+3. Use existing canonical examples; never invent new conventions.
+4. Write the router line in the original artifact when appropriate (e.g. "Use the <skill> skill for <task>.").
+5. Never copy the same content into both places: the source keeps the router, the target keeps the procedure.
+6. Record the placement provenance in state: placement_change with from, to, reason, preserved_router, source_hash.
+7. Self-score against the rubric, including the context_placement criterion (placement deliberate, no duplication after extraction, router preserved, discoverability preserved). Below 85: fix and re-score; never hand off REVISE.

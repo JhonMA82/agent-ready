@@ -13,14 +13,25 @@ Procedure for the mandatory review gate. Read this reference when a candidate sk
 3. Verify evidence grounding: trace each instruction to a FACT or harness fact; before scoring, run `agent-ready state --json` and `agent-ready inspect --json` (both are available in every initialized repository; skipping them is a blocking concern); flag invented files, APIs, or flows.
 4. Apply the External Verification Gate to every version-sensitive framework, package-manager, or toolchain claim: it MUST cite current official or versioned evidence tied to the applicable version, or carry an explicit reasoned exemption showing that no external claim is embedded. repository-to-official research precedence stays intact; a claim that fails the gate is a blocking concern.
 5. Scan the anti-patterns: context dumping, generic advice, vague trigger, procedure-less body, duplicate skill, nice-to-have.
-6. Score each criterion against its full-score requirement; partial points name the missing part.
-7. Apply thresholds: >= 85 PASS, 70-84 REVISE, < 70 REJECT.
-8. Write the score sheet: per-criterion scores, total, verdict, one grounded justification per criterion.
-9. Record the sheet in state; REVISE names the failing criteria; REJECT records the score and justification.
+6. Apply the placement checks to extraction candidates; a failing check is a blocking concern.
+7. Score each criterion against its full-score requirement, including context_placement; partial points name the missing part.
+8. Apply thresholds: >= 85 PASS, 70-84 REVISE, < 70 REJECT.
+9. Write the score sheet: per-criterion scores, total, verdict, one grounded justification per criterion.
+10. Record the sheet in state; REVISE names the failing criteria; REJECT records the score and justification.
 
 ## Rejection contract
 
-REJECT an artifact when it has missing required assessment, unsupported package-manager certainty, framework/toolchain claims that fail the External Verification Gate, capability claims exceeding tested support, hidden conflicts, migration decisions presented as facts, or semantic verdicts routed through Go. NO_ACTION and Tool Budget remain valid model-owned outcomes and are never grounds for rejection.
+REJECT an artifact when it has missing required assessment, unsupported package-manager certainty, framework/toolchain claims that fail the External Verification Gate, capability claims exceeding tested support, hidden conflicts, migration decisions presented as facts, or semantic verdicts routed through Go. REJECT an extraction that moves a global invariant into a skill, makes a critical rule harder to discover, duplicates content instead of moving it, or produces no real context saving. A technically excellent skill is REJECTED if the same content remains fully in AGENTS: it adds no progressive disclosure. NO_ACTION and Tool Budget remain valid model-owned outcomes and are never grounds for rejection.
+
+## Placement checks
+
+Run all four placement checks on every extraction candidate:
+- `context_savings`: the move reduces permanent context without losing guidance.
+- `duplication_after_extraction`: the content must not remain duplicated in the source.
+- `discoverability_preserved`: critical rules stay discoverable after the move.
+- `always_on_guidance_not_removed`: a global invariant must not be moved into a skill.
+
+A failing placement check is a blocking concern: REJECT the extraction.
 
 ## Named checks
 

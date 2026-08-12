@@ -16,8 +16,49 @@ How a ChangeSet becomes selective updates. Read this reference when `changes` re
 - The ChangeSet and stage always come from the fact helpers: run `agent-ready changes --json` and `agent-ready checkpoint status`; direct file reads never replace them.
 - A sync MUST assess whether changed evidence can affect tool needs; never skip the assessment silently.
 - Manifest, lockfile, workspace, wrapper, CI, framework, build/test output, or tool-fact changes MUST trigger reassessment of tool capabilities.
+- Reassess tool needs when the repository changes materially: repo complexity materially changes, workspace count changes, new framework added, new language ecosystem added, tool output problem observed, or a new provider is already installed.
 - A completed reassessment MUST include reasons and either categorized recommendations (ecosystem, productivity, provider) or `NO_ADDITIONAL_TOOLS`.
 - Irrelevant changes (prose, docs, formatting) MUST record a reason for skipping the reassessment.
+
+## Placement-change detection
+
+Detect placement changes in the ChangeSet: AGENTS content changed, skill changed, reference changed, canonical example changed. When a skill was extracted from AGENTS, update the source dependency graph (derived_from / routed_from / refresh_when) instead of re-reading sources; never re-duplicate automatically — an extraction's source change updates the graph, it does not copy content back.
+
+## Artifact graph relations and placement provenance
+
+Artifact relations are recorded on the artifact graph:
+
+```yaml
+artifact:
+  path: .opencode/skills/add-dashboard-screen/SKILL.md
+  derived_from:
+    - AGENTS.md#adding-screen
+    - src/routes/**
+  routed_from:
+    - AGENTS.md
+  refresh_when:
+    - source_section_changed
+    - route_structure_changed
+    - canonical_example_changed
+```
+
+Placement moves record provenance:
+
+```yaml
+placement_change:
+  from:
+    path: AGENTS.md
+    section: "Adding a screen"
+  to:
+    path: .opencode/skills/add-dashboard-screen/SKILL.md
+  reason: task_specific_procedure
+  preserved_router:
+    path: AGENTS.md
+    text: "Use the add-dashboard-screen skill for new dashboard screens."
+  source_hash: <hash>
+```
+
+Sync reads this provenance to decide whether a source change refreshes the extracted artifact or only the graph.
 
 ## Rules
 

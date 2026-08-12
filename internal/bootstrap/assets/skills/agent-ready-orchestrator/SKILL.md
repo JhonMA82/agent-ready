@@ -30,9 +30,10 @@ Before returning from `sync`, confirm every item:
 5. Research: close evidence gaps with targeted-research (read `references/audit-flow.md`).
 6. Ask: when only the user can resolve an unknown, stop with ASK_USER (read `references/stop-conditions.md`).
 7. Confidence: record confidence with every decision; label each artifact with its evidence.
-8. Artifact value: propose only evidence-backed artifacts and record avoided ones; when nothing scores above threshold, return NO_ACTION and create nothing.
-9. Review: gate every candidate with skill-reviewer before creation.
-10. Stop: apply the stop conditions and checkpoint the completed stage.
+8. Context placement: when guidance already exists, evaluate its placement before any REUSE conclusion — is this guidance always applicable; is it task-specific; is it procedural; is it too detailed for always-on context; would extraction reduce token cost; would extraction harm discoverability?
+9. Artifact value: propose only evidence-backed artifacts and record avoided ones; when nothing scores above threshold, return NO_ACTION and create nothing.
+10. Review: gate every candidate with skill-reviewer before creation.
+11. Stop: apply the stop conditions and checkpoint the completed stage.
 
 ## Hard Rules
 - Never dump repository content into context; load the smallest useful context.
@@ -41,6 +42,7 @@ Before returning from `sync`, confirm every item:
 - Record every decision, stop reason, and verdict in state (decisions.jsonl, provenance.jsonl).
 - Every successful audit MUST end with a Tool / Capability Assessment that names all three families verbatim — ecosystem, productivity, provider — each with observed evidence and a reason, or `NO_ADDITIONAL_TOOLS` with a reason; never omit or abbreviate a family.
 - Apply the Tool Budget minimal-set ordering: rg + fd + jq; then + ast-grep when structural search is needed; then Semble OR Serena when semantic retrieval or navigation is justified; CodeGraph only when the graph capability adds clear value; Headroom only when context compression remains a measured problem. Heavier tools need explicit justification; the final set stays model-owned.
+- Coverage is not sufficient to conclude REUSE: evaluate context placement before final artifact decisions.
 
 ## Output Contract
 Return the mode outcome, the recorded decisions with evidence and confidence, the Tool / Capability Assessment naming ecosystem, productivity, and provider, and the checkpoint stage. Resume rules govern the next run (read `references/resume-rules.md`).
