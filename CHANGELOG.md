@@ -6,13 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## Source of truth
 
-Every entry below is cross-checked against `git log --oneline 6a07341..HEAD` on branch `feat/v1-close-changelog`; the **Covered commits** line under each release lists the exact commits the entry describes. No feature is listed that is not present in the commit history. Release tags follow the goreleaser `v*` filter (`goreleaser.yml` → `release`); the `v1.0.0` tag is deferred and is not created by this change.
+Every entry below is cross-checked against the repository commit history; the **Covered commits** line under each release lists the commits that introduced the described behavior. Release tags follow the goreleaser `v*` filter (`goreleaser.yml` → `release`). The V1 close is additionally checkpointed by `v1.0.0-facts` and `v1.0.0-sync-contract`; the final `v1.0.0` tag marks the archived, verified release.
 
 ## [v1.0.0] - 2026-08-11
 
-Covers `40ff819..HEAD` (18 commits): the V1 completion change plus the six bounded close slices that bring `OPENCODE_AGENT_READY_V1_COMPLETION_2026.md` (§1–§67) to full compliance. HEAD at the time of writing is `9912ae1`.
+Covers the V1 completion change, six bounded close slices, the facts remediation checkpoint `c180e97`, and the sync-contract checkpoint `3a038f4` that bring `OPENCODE_AGENT_READY_V1_COMPLETION_2026.md` (§1–§67) to full compliance. The archived SDD report records 40/40 requirements and 83/83 scenarios passing.
 
-**Covered commits**: `40ff819`, `8a35780`, `bba4806`, `4e6bb64`, `b65cf9b`, `304642b`, `df80798`, `dc15a5b`, `62cad46`, `d2fbbbf`, `ff57787`, `f440c56`, `29b8103`, `dc0c62a`, `2650e18`, `0e43d46`, `1b9349d`, `9912ae1`
+**Covered commits**: `40ff819`, `8a35780`, `bba4806`, `4e6bb64`, `b65cf9b`, `304642b`, `df80798`, `dc15a5b`, `62cad46`, `d2fbbbf`, `ff57787`, `f440c56`, `29b8103`, `dc0c62a`, `2650e18`, `0e43d46`, `1b9349d`, `9912ae1`, `c180e97`, `3a038f4`
 
 ### Added
 
@@ -23,6 +23,7 @@ Covers `40ff819..HEAD` (18 commits): the V1 completion change plus the six bound
 - **Content contracts** — §15 Tool Budget ordering, §28 seven questions, §29 `skill_request` fields, §30 named reviewer checks, and §54 vocabulary enforced in the embedded skills (`1b9349d`).
 - **Fixture matrix** — deterministic §33–§44 ecosystem tables plus NixOS Wizard and Laravel driven regression cohorts proving §52–§61 acceptance (`9912ae1`).
 - **External verification gate** — reviews enforce external verification when required (`62cad46`).
+- **Complete ecosystem and boilerplate facts** — PHP/Composer, Rust/Cargo, Nix, Dart, SwiftPM, container/IaC signals, empty-version framework evidence, and generated/editable file facts (`c180e97`, checkpoint `v1.0.0-facts`).
 
 ### Changed
 
@@ -32,6 +33,7 @@ Covers `40ff819..HEAD` (18 commits): the V1 completion change plus the six bound
 - **Mandatory tool assessment** — audits mandate tool/capability assessment (`df80798`).
 - **Relevant-sync reassessment** — tools reassessed on relevant syncs (`dc15a5b`).
 - **OpenCode version decoupling** — harness no longer depends on an exact OpenCode version (`d2fbbbf`).
+- **Explicit sync handoff** — sync loads its specialized flow, records reason-bearing relevance/reassessment decisions, and persists model-owned state before returning (`3a038f4`, checkpoint `v1.0.0-sync-contract`).
 
 ### Fixed
 

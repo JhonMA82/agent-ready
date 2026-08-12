@@ -1,0 +1,75 @@
+schema: spec-driven
+persistence: hybrid
+strict_tdd: false
+
+context: |
+  Project: agent-ready, a Go 1.24 module with a Cobra CLI and embedded OpenCode-native harness assets.
+  Architecture: cmd/agent-ready is the entry point; deterministic fact, lifecycle, inventory, ecosystem, tool, and bootstrap logic lives under internal/.
+  Testing: Go standard testing covers unit and fixture-backed acceptance layers; real OpenCode driven cohorts are conditional on model, runtime, and auth prerequisites.
+  Quality: CI runs go test ./... and go vet ./...; release checks also run go build ./... and gofmt is the repository formatter.
+  Conventions: Keep outputs deterministic and fact-only, preserve model-owned semantic decisions, use table-driven tests, and keep changes reviewable within the 400-line budget.
+  Compatibility: OpenCode host updates are accepted at or above the documented compatibility floor; do not introduce a fixed runtime-version dependency.
+  Active change: agent-ready-v1-close is preserved with 39/39 tasks complete and is ready for native verification.
+
+testing:
+  detected: 2026-08-11
+  strict_tdd: false
+  runner:
+    command: go test ./...
+    framework: Go standard library testing
+    packages: 16
+  layers:
+    unit:
+      available: true
+      command: go test ./...
+      tool: go test
+    integration:
+      available: true
+      command: go test ./internal/app -run 'TestAcceptance'
+      tool: standard testing with CLI and repository fixtures
+    e2e:
+      available: conditional
+      command: AGENT_READY_DRIVEN_MODEL=<model> go test ./internal/app -run 'TestDrivenAudit|TestDrivenReview|TestDrivenSync|TestDrivenFixtures' -timeout 40m
+      tool: real OpenCode runtime
+      prerequisites: AGENT_READY_DRIVEN_MODEL, opencode on PATH, and OpenCode auth.json
+  coverage:
+    available: true
+    command: go test -cover ./...
+    threshold: none configured
+  quality:
+    linter:
+      available: true
+      command: go vet ./...
+    type_checker:
+      available: true
+      command: go build ./...
+    formatter:
+      available: true
+      command: gofmt -l .
+
+rules:
+  proposal:
+    - Include rollback boundaries and a risk plan for changes that can affect repository state or user-owned files.
+    - Read and preserve existing active OpenSpec artifacts before continuing a change.
+  specs:
+    - Use Given/When/Then scenarios and RFC 2119 keywords (MUST, SHALL, SHOULD, MAY).
+    - Keep deterministic facts separate from model-owned semantic recommendations and verdicts.
+  design:
+    - Document architecture decisions with rationale and include sequence diagrams for complex flows.
+    - Preserve ownership-safe, consent-gated behavior and byte-stable deterministic output.
+  tasks:
+    - Group work by bounded phase or slice, use hierarchical numbering, and keep each work unit reviewable within 400 changed lines.
+    - Include focused tests, full-suite validation, and rollback boundaries for each implementation slice.
+  apply:
+    guidelines:
+      - Follow existing Go patterns, table-driven test conventions, and repository formatting.
+      - Do not overwrite or delete active change artifacts; update them only after reading them.
+    tdd: false
+    test_command: go test ./...
+  verify:
+    test_command: go test ./...
+    build_command: go build ./...
+    vet_command: go vet ./...
+    coverage_threshold: 0
+  archive:
+    - Preserve archived changes as an audit trail and warn before merging destructive deltas.
