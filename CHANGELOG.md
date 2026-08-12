@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Every entry below is cross-checked against the repository commit history; the **Covered commits** line under each release lists the commits that introduced the described behavior. Release tags follow the goreleaser `v*` filter (`goreleaser.yml` → `release`). The V1 close is additionally checkpointed by `v1.0.0-facts` and `v1.0.0-sync-contract`; the final `v1.0.0` tag marks the archived, verified release.
 
+## [Unreleased]
+
+Context placement & token optimization refinement (per `OPENCODE_AGENT_READY_V1_CONTEXT_PLACEMENT_REFINEMENT.md`). Commit hashes are added on release.
+
+### Added
+
+- **Context placement contract** — placement hierarchy (AGENTS.md → skill → reference → script), Context Placement Gate before any REUSE conclusion, placement analysis contract with qualitative cost model, usage-frequency discipline, and five new decision verbs: `COMPACT`, `EXTRACT_TO_SKILL`, `MOVE_TO_REFERENCE`, `REPLACE_WITH_SCRIPT`, `REUSE_EXTERNAL_SKILL`.
+- **Extraction support** — `skill-creator` authors extractions without duplication (router left in source, placement provenance recorded); `skill-reviewer` runs placement checks (`context_savings`, `duplication_after_extraction`, `discoverability_preserved`, `always_on_guidance_not_removed`).
+- **Repository kind** — `repository-analysis` classifies starter/boilerplate/template with primary/secondary/confidence and runs the boilerplate-specific audit (extension points, generated files, feature workflow, upgrade strategy).
+- **Placement and tool signals** — `inspect --json` emits the `agents_md` fact; `tools recommend --json` emits `context_placement_pressure` (AGENTS.md > 300 lines, signal only), `structured_search_need` (ast-grep), and an enriched RTK candidate fired by output dirs, build/test scripts, or CI (no longer only `dist/build/coverage`).
+- **Sync extension** — placement-change detection (AGENTS/skill/reference/canonical example), artifact-graph relations (`derived_from`/`routed_from`/`refresh_when`), placement provenance, and new tool-reassessment triggers.
+- **Regression fixtures Q–U** — tanstack-shadcn boilerplate, long AGENTS (500+ lines), short optimal AGENTS, deterministic procedure, external canonical skill.
+
+### Changed
+
+- **Skill quality rubric** — added `context_placement` (weight 10); rebalanced to necessity 20, repository-specificity 15, discovery description 15, procedural value 15, progressive disclosure 10, evidence grounding 10, validation 5.
+
 ## [v1.0.0] - 2026-08-11
 
 Covers the V1 completion change, six bounded close slices, the facts remediation checkpoint `c180e97`, and the sync-contract checkpoint `3a038f4` that bring `OPENCODE_AGENT_READY_V1_COMPLETION_2026.md` (§1–§67) to full compliance. The archived SDD report records 40/40 requirements and 83/83 scenarios passing.
