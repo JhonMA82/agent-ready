@@ -576,6 +576,26 @@ func TestResearchDesignEvolutionContent(t *testing.T) {
 		}
 	}
 
+	command := readAsset(t, "assets/commands/agent-ready.md")
+	for _, marker := range []string{"agent-ready-orchestrator", "For `sync`", "incremental-evolution", "references/sync-flow.md", "before any model work"} {
+		if !strings.Contains(command, marker) {
+			t.Fatalf("agent-ready command missing sync handoff marker %q", marker)
+		}
+	}
+
+	orch := readAsset(t, "assets/skills/agent-ready-orchestrator/SKILL.md")
+	for _, marker := range []string{
+		"## Sync Handoff", "## Sync Completion Checklist", "before any model work",
+		"MUST load `incremental-evolution`",
+		".agent-ready/state/decisions.jsonl", "Go does not write semantic state",
+		"relevant or irrelevant", "reason-bearing reassessment", "reasoned skip",
+		"categorized", "NO_ADDITIONAL_TOOLS", "The model has written one",
+	} {
+		if !strings.Contains(orch, marker) {
+			t.Fatalf("orchestrator missing sync-contract marker %q", marker)
+		}
+	}
+
 	research := readAsset(t, "assets/skills/targeted-research/SKILL.md")
 	if !strings.Contains(research, "references/search-strategies.md") {
 		t.Fatal("targeted-research body must name references/search-strategies.md")
@@ -605,7 +625,7 @@ func TestResearchDesignEvolutionContent(t *testing.T) {
 	if !strings.Contains(evolution, "references/sync-flow.md") {
 		t.Fatal("incremental-evolution body must name references/sync-flow.md")
 	}
-	for _, marker := range []string{"ChangeSet", "changed paths", "Never re-run a full audit", "Not every dependency", "changes` and `checkpoint status"} {
+	for _, marker := range []string{"ChangeSet", "changed paths", "Never re-run a full audit", "Not every dependency", "changes` and `checkpoint status", "Sync output", "relevant-vs-irrelevant", "reason-bearing reassessment", "reasoned skip", "categorized recommendations", "NO_ADDITIONAL_TOOLS", "one record", "model-owned", "Go does not write semantic state"} {
 		if !strings.Contains(evolution, marker) {
 			t.Fatalf("incremental-evolution missing %q", marker)
 		}
@@ -650,6 +670,11 @@ func TestResearchDesignEvolutionContent(t *testing.T) {
 	for _, marker := range []string{"Selective updates", "No full re-audit", "Not every dependency", "NO_ACTION"} {
 		if !strings.Contains(syncFlow, marker) {
 			t.Fatalf("sync-flow missing %q", marker)
+		}
+	}
+	for _, marker := range []string{"Output templates", "Relevant lockfile change", "Irrelevant prose change", "package-lock.json", "README.md", "explicit reason", ".agent-ready/state/decisions.jsonl", "shape guidance", "model-owned", `"relevance":"relevant"`, `"relevance":"irrelevant"`} {
+		if !strings.Contains(syncFlow, marker) {
+			t.Fatalf("sync-flow missing output-contract marker %q", marker)
 		}
 	}
 

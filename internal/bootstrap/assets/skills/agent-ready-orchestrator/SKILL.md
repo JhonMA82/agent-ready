@@ -10,6 +10,18 @@ Coordinate the repository-local `/agent-ready` run: dispatch the requested mode,
 - review: gate a candidate skill with skill-reviewer before acceptance.
 - status: report checkpoint and state facts; decide resume or NO_ACTION (read `references/resume-rules.md`).
 
+## Sync Handoff
+- For `sync`, the orchestrator MUST load `incremental-evolution` and `references/sync-flow.md` before any model work. Start with the `agent-ready changes --json` ChangeSet and `agent-ready checkpoint status` stage facts; do not infer them from prose or direct reads.
+- Sync classifications, reassessments, recommendations, and verdicts are model-owned. Before returning, the model MUST persist one record in `.agent-ready/state/decisions.jsonl`; Go fact helpers only observe deterministic state. Go does not write semantic state.
+
+## Sync Completion Checklist
+Before returning from `sync`, confirm every item:
+- [ ] ChangeSet and checkpoint stage facts are recorded.
+- [ ] Every changed path is classified relevant or irrelevant with an explicit reason.
+- [ ] Relevant changes have a reason-bearing reassessment; irrelevant changes have a reasoned skip.
+- [ ] A completed reassessment has categorized ecosystem, productivity, and provider recommendations, or `NO_ADDITIONAL_TOOLS` with a reason.
+- [ ] The model has written one `.agent-ready/state/decisions.jsonl` record.
+
 ## Adaptive Loop
 1. What I know: gather deterministic facts (inspect, state, changes, checkpoint status); label findings with repository-analysis.
 2. What I do not know: list the unknowns that block decisions; classify every finding FACT, INFERENCE, or UNKNOWN.

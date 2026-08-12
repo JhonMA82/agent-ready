@@ -27,3 +27,37 @@ How a ChangeSet becomes selective updates. Read this reference when `changes` re
 - Reassessment reads `tools status` and `tools recommend` facts and never re-runs the initial audit; skip decisions are recorded in state.
 - Unchanged paths never appear in sync output; they are already aligned with the checkpoint baseline.
 - Nothing changed and no pending plan: return NO_ACTION with zero artifacts.
+
+## Output templates (shape guidance)
+
+These examples show the required shape, not prescribed semantic conclusions. Model-owned verdicts and artifact choices remain free.
+Every classification and reassessment record MUST carry an explicit reason grounded in the observed ChangeSet.
+
+### Relevant lockfile change
+
+```text
+ChangeSet: changed package-lock.json
+Stage: baseline
+Classification: relevant — reason: the new lockfile is versioned-dependency evidence and may change capability needs.
+Reassessment: completed — reason: lockfile evidence can affect tool selection.
+Recommendations: ecosystem=<model-owned>; productivity=<model-owned>; provider=<model-owned>
+```
+
+```jsonl
+{"type":"sync","path":"package-lock.json","relevance":"relevant","reason":"lockfile adds versioned-dependency evidence that may affect capability needs","reassessment":"completed because lockfile evidence can affect tool selection","recommendations":{"ecosystem":"<model-owned>","productivity":"<model-owned>","provider":"<model-owned>"}}
+```
+
+### Irrelevant prose change
+
+```text
+ChangeSet: changed README.md
+Stage: baseline
+Classification: irrelevant — reason: prose-only content does not alter repository tool or framework evidence.
+Reassessment: skipped — reason: no tool-capability facts changed.
+```
+
+```jsonl
+{"type":"sync","path":"README.md","relevance":"irrelevant","reason":"prose-only content does not alter repository tool or framework evidence","reassessment":"skipped","skip_reason":"no tool-capability facts changed"}
+```
+
+Before return, append one model-owned JSONL state record to `.agent-ready/state/decisions.jsonl` for the sync. The Go layer observes facts and does not write semantic state.
