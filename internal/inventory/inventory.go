@@ -39,6 +39,14 @@ type Presence struct {
 	Kind string `json:"kind"`
 }
 
+// AgentsMDFact records a root-level AGENTS.md and its line count (refinement
+// §46 context_placement_pressure signal source; decision D3). Path is
+// repository-relative; the fact is omitted when no AGENTS.md exists.
+type AgentsMDFact struct {
+	Path  string `json:"path"`
+	Lines int    `json:"lines"`
+}
+
 // BoilerplateFacts records explicit extension and generated/editable markers.
 // Paths are repository-relative and sorted; empty collections stay omitted.
 type BoilerplateFacts struct {
@@ -49,15 +57,16 @@ type BoilerplateFacts struct {
 
 // Facts is the agent-ready.inspect/v1 schema; slices and map keys are sorted.
 type Facts struct {
-	SchemaVersion string     `json:"schema_version"`
-	Root          string     `json:"root"`
-	Invocation    string     `json:"invocation,omitempty"`
-	Deps          []Dep      `json:"deps"`
-	Scripts       []Script   `json:"scripts"`
-	Workspaces    []string   `json:"workspaces"`
-	Files         Files      `json:"files"`
-	CI            CI         `json:"ci"`
-	Presence      []Presence `json:"presence,omitempty"`
+	SchemaVersion string        `json:"schema_version"`
+	Root          string        `json:"root"`
+	Invocation    string        `json:"invocation,omitempty"`
+	Deps          []Dep         `json:"deps"`
+	Scripts       []Script      `json:"scripts"`
+	Workspaces    []string      `json:"workspaces"`
+	Files         Files         `json:"files"`
+	CI            CI            `json:"ci"`
+	Presence      []Presence    `json:"presence,omitempty"`
+	AgentsMD      *AgentsMDFact `json:"agents_md,omitempty"`
 	ecosystem.Facts
 	OutputSignals []ecosystem.Signal `json:"output_signals,omitempty"`
 	BoilerplateFacts
@@ -164,11 +173,46 @@ func Inspect(root, invocation string) (Facts, error) {
 	})
 	sort.Slice(scripts, func(i, j int) bool { return scripts[i].Name < scripts[j].Name })
 	sort.Strings(workspaces)
-	facts := Facts{SchemaVersion: SchemaVersion, Root: root, Deps: deps, Scripts: scripts, Workspaces: workspaces, Files: files, CI: findCI(paths), Presence: presence, OutputSignals: outputSignals, Facts: ecosystem.Detect(root, paths), BoilerplateFacts: collectBoilerplateFacts(root, paths)}
+	agentsMD, err := agentsMDFact(root)
+	if err != nil {
+		return Facts{}, err
+	}
+	facts := Facts{SchemaVersion: SchemaVersion, Root: root, Deps: deps, Scripts: scripts, Workspaces: workspaces, Files: files, CI: findCI(paths), Presence: presence, AgentsMD: agentsMD, OutputSignals: outputSignals, Facts: ecosystem.Detect(root, paths), BoilerplateFacts: collectBoilerplateFacts(root, paths)}
 	if invocation != "" && invocation != root {
 		facts.Invocation = invocation
 	}
 	return facts, nil
+}
+
+// agentsMDFact reports the root-level AGENTS.md fact when present; the fact
+// is omitted when the file is absent (refinement §46, decision D3).
+func agentsMDFact(root string) (*AgentsMDFact, error) {
+	data, err := os.ReadFile(filepath.Join(root, "AGENTS.md"))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &AgentsMDFact{Path: "AGENTS.md", Lines: countLines(data)}, nil
+}
+
+// countLines reports the number of lines in data: one per line separator,
+// plus one when the content is non-empty and does not end with "\n".
+func countLines(data []byte) int {
+	if len(data) == 0 {
+		return 0
+	}
+	count := 1
+	for _, b := range data {
+		if b == '\n' {
+			count++
+		}
+	}
+	if data[len(data)-1] == '\n' {
+		count--
+	}
+	return count
 }
 
 func collectBoilerplateFacts(root string, paths []string) BoilerplateFacts {

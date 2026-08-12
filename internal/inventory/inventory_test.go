@@ -262,6 +262,47 @@ func TestInspectAttachesEcosystemFactsFromBoundedPaths(t *testing.T) {
 	}
 }
 
+func TestAgentsMDFact(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		content string
+		want    int
+	}{
+		{name: "trailing newline", content: "line one\nline two\nline three\n", want: 3},
+		{name: "no trailing newline", content: "line one\nline two\nline three", want: 3},
+		{name: "single line", content: "# demo\n", want: 1},
+		{name: "empty file", content: "", want: 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			write(t, root, "AGENTS.md", tc.content)
+			facts, err := Inspect(root, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if facts.AgentsMD == nil || facts.AgentsMD.Path != "AGENTS.md" || facts.AgentsMD.Lines != tc.want {
+				t.Fatalf("agents_md fact: got %+v, want AGENTS.md with %d lines", facts.AgentsMD, tc.want)
+			}
+		})
+	}
+}
+
+func TestAgentsMDFactOmitted(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "README.md", "# demo\n")
+	facts, err := Inspect(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if facts.AgentsMD != nil {
+		t.Fatalf("agents_md must be nil without AGENTS.md: %+v", facts.AgentsMD)
+	}
+	data, _ := json.Marshal(facts)
+	if strings.Contains(string(data), "agents_md") {
+		t.Fatalf("agents_md must be omitted from JSON without AGENTS.md: %s", data)
+	}
+}
+
 func TestOutputSignals(t *testing.T) {
 	root := t.TempDir()
 	write(t, root, "main.go", "package main\n")

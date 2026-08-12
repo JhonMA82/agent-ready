@@ -55,15 +55,17 @@ func TestRecommendEmptyRepo(t *testing.T) {
 
 func TestRecommendNoSynthesizedDefault(t *testing.T) {
 	root := t.TempDir()
-	for i := 0; i < 501; i++ {
+	for i := 0; i < 5; i++ {
 		writeFile(t, root, "f"+strconv.Itoa(i)+".txt", "x")
 	}
 	facts, err := Recommend(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A large signal-free repo used to synthesize a Semble verdict; Slice 6
-	// grounds only documented signals, so no default may appear.
+	// Only documented §36/§46 signals may generate candidates. The fixture
+	// stays small: a large plain-file repo would legitimately fire ast-grep
+	// via the structured_search_need total-file threshold (>=300 files), so
+	// the no-synthesized-default guard uses a small signal-free repo.
 	if len(facts.Candidates) != 0 {
 		t.Fatalf("signal-free repo must stay empty: %+v", facts.Candidates)
 	}
@@ -299,6 +301,251 @@ func TestRecommendD4ConditionalProviderSignals(t *testing.T) {
 		switch candidate.CatalogID {
 		case "codegraph", "context7", "headroom", "semble", "serena":
 			t.Fatalf("small repository must not fire provider candidates: %+v", facts.Candidates)
+		}
+	}
+}
+
+// §46 structured_search_need: ast-grep fires on a large source surface
+// (>=100 source files or >=300 total files) and stays silent on small repos.
+func TestRecommendStructuredSearchNeed(t *testing.T) {
+	t.Run("source threshold", func(t *testing.T) {
+		root := t.TempDir()
+		for i := 0; i < 100; i++ {
+			writeFile(t, root, "src/f"+strconv.Itoa(i)+".go", "package src\n")
+		}
+		facts, err := Recommend(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(facts.Candidates) != 1 || facts.Candidates[0].Candidate != "ast-grep" {
+			t.Fatalf("100 source files must fire exactly ast-grep: %+v", facts.Candidates)
+		}
+		got := facts.Candidates[0]
+		if got.Capability != "structured_search_need" || got.Signal != "structured_search_need" ||
+			got.CatalogID != "ast-grep" || !strings.Contains(got.Observed, "source_files=100") {
+			t.Fatalf("ast-grep candidate fields: %+v", got)
+		}
+	})
+	t.Run("total file threshold", func(t *testing.T) {
+		root := t.TempDir()
+		for i := 0; i < 300; i++ {
+			writeFile(t, root, "f"+strconv.Itoa(i)+".txt", "x")
+		}
+		facts, err := Recommend(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(facts.Candidates) != 1 || facts.Candidates[0].Candidate != "ast-grep" {
+			t.Fatalf("300 total files must fire exactly ast-grep: %+v", facts.Candidates)
+		}
+		if !strings.Contains(facts.Candidates[0].Observed, "files=300") {
+			t.Fatalf("ast-grep observed must cite total files: %+v", facts.Candidates[0])
+		}
+	})
+	t.Run("small repo", func(t *testing.T) {
+		root := t.TempDir()
+		for i := 0; i < 10; i++ {
+			writeFile(t, root, "src/f"+strconv.Itoa(i)+".go", "package src\n")
+		}
+		facts, err := Recommend(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, candidate := range facts.Candidates {
+			if candidate.Candidate == "ast-grep" {
+				t.Fatalf("small repo must not fire ast-grep: %+v", facts.Candidates)
+			}
+		}
+	})
+}
+
+// D3: context_placement_pressure fires only when a root AGENTS.md exceeds
+// 300 lines; the threshold itself never fires.
+func TestRecommendContextPlacementPressure(t *testing.T) {
+	t.Run("over 300 lines", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, root, "AGENTS.md", strings.Repeat("line\n", 301))
+		facts, err := Recommend(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(facts.Candidates) != 1 || facts.Candidates[0].Candidate != "context-placement" {
+			t.Fatalf("AGENTS.md over 300 lines must fire exactly context-placement: %+v", facts.Candidates)
+		}
+		got := facts.Candidates[0]
+		if got.Capability != "context_placement_pressure" || got.Signal != "context_placement_pressure" ||
+			!strings.Contains(got.Observed, "AGENTS.md: 301 lines") {
+			t.Fatalf("context-placement candidate fields: %+v", got)
+		}
+	})
+	t.Run("at 300 lines", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, root, "AGENTS.md", strings.Repeat("line\n", 300))
+		facts, err := Recommend(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, candidate := range facts.Candidates {
+			if candidate.Candidate == "context-placement" {
+				t.Fatalf("AGENTS.md at 300 lines must not fire context-placement: %+v", facts.Candidates)
+			}
+		}
+	})
+	t.Run("short well-placed agents", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, root, "AGENTS.md", strings.Repeat("line\n", 60))
+		facts, err := Recommend(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, candidate := range facts.Candidates {
+			if candidate.Candidate == "context-placement" {
+				t.Fatalf("~60-line AGENTS.md must not fire context-placement: %+v", facts.Candidates)
+			}
+		}
+	})
+}
+
+// §15: RTK evidence must not rest only on dist/build/coverage; build/test
+// scripts and CI configuration are independent deterministic triggers while
+// the signal value and catalog truth stay unchanged.
+func TestRecommendRTKBeyondOutputDirs(t *testing.T) {
+	t.Run("build/test scripts without output dirs", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, root, "package.json", `{"scripts":{"build":"tsc","Check:fix":"tsc --noEmit --fix"}}`)
+		facts, err := Recommend(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var rtk *Candidate
+		for i := range facts.Candidates {
+			if facts.Candidates[i].Candidate == "RTK" {
+				rtk = &facts.Candidates[i]
+			}
+		}
+		if rtk == nil {
+			t.Fatalf("build/test scripts must fire RTK without output dirs: %+v", facts.Candidates)
+		}
+		if rtk.Signal != "rtk" || !strings.Contains(rtk.Observed, "scripts=Check:fix,build") ||
+			strings.Contains(rtk.Observed, "output_directories") {
+			t.Fatalf("RTK evidence from scripts: %+v", rtk)
+		}
+		if rtk.Capabilities == nil || *rtk.Capabilities != entryByID(t, "rtk").Capabilities {
+			t.Fatalf("RTK must carry catalog truth: %+v", rtk)
+		}
+	})
+	t.Run("CI without output dirs", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, root, ".github/workflows/ci.yml", "name: ci\n")
+		facts, err := Recommend(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(facts.Candidates) != 1 || facts.Candidates[0].Candidate != "RTK" {
+			t.Fatalf("CI must fire exactly RTK without output dirs: %+v", facts.Candidates)
+		}
+		if !strings.Contains(facts.Candidates[0].Observed, "ci=.github/workflows/ci.yml") {
+			t.Fatalf("RTK observed must cite CI files: %+v", facts.Candidates[0])
+		}
+	})
+	t.Run("output dirs still fire", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, "dist"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		facts, err := Recommend(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var rtk *Candidate
+		for i := range facts.Candidates {
+			if facts.Candidates[i].Candidate == "RTK" {
+				rtk = &facts.Candidates[i]
+			}
+		}
+		if rtk == nil || !strings.Contains(rtk.Observed, "output_directories=dist") {
+			t.Fatalf("output dirs must still fire RTK with directory evidence: %+v", facts.Candidates)
+		}
+	})
+}
+
+// The appended candidates differ in catalog truth: ast-grep carries the
+// catalog entry's capabilities, while context-placement intentionally has no
+// catalog entry (it signals placement decisions, not an installable tool).
+func TestRecommendAppendedCandidateCapabilityTruth(t *testing.T) {
+	root := t.TempDir()
+	for i := 0; i < 100; i++ {
+		writeFile(t, root, "src/f"+strconv.Itoa(i)+".go", "package src\n")
+	}
+	writeFile(t, root, "AGENTS.md", strings.Repeat("line\n", 301))
+	facts, err := Recommend(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var astGrep, placement *Candidate
+	for i := range facts.Candidates {
+		switch facts.Candidates[i].Candidate {
+		case "ast-grep":
+			astGrep = &facts.Candidates[i]
+		case "context-placement":
+			placement = &facts.Candidates[i]
+		}
+	}
+	if astGrep == nil || placement == nil {
+		t.Fatalf("expected ast-grep and context-placement candidates: %+v", facts.Candidates)
+	}
+	if astGrep.Capabilities == nil || *astGrep.Capabilities != entryByID(t, "ast-grep").Capabilities {
+		t.Fatalf("ast-grep must carry catalog capability truth: %+v", astGrep)
+	}
+	if placement.Capabilities != nil || placement.CatalogID != "" {
+		t.Fatalf("context-placement must have nil capabilities and no catalog id (no catalog entry): %+v", placement)
+	}
+}
+
+// The appended candidates come after the nine existing ones, so indices 0–8
+// stay stable; ast-grep precedes context-placement in the emitted order.
+func TestRecommendAppendedSignalsOrder(t *testing.T) {
+	root := t.TempDir()
+	fakeGit(t, root)
+	addGitHubRemote(t, root)
+	writeFile(t, root, "go.mod", "module example.com/app\n\ngo 1.24\n")
+	writeFile(t, root, "go.sum", "checksum\n")
+	deps := "{\"dependencies\":{"
+	for i := 0; i < 60; i++ {
+		deps += "\"dep" + strconv.Itoa(i) + "\":\"1.0.0\","
+	}
+	deps = strings.TrimSuffix(deps, ",") + "},\"scripts\":{\"build\":\"tsc\",\"test\":\"jest\"}}\n"
+	writeFile(t, root, "package.json", deps)
+	writeFile(t, root, "pnpm-workspace.yaml", "packages:\n  - packages/*\n")
+	writeFile(t, root, "Cargo.toml", "[package]\nname = \"demo\"\n\n[dependencies]\nratatui = \"0.29.0\"\n")
+	for i := 0; i < 100; i++ {
+		writeFile(t, root, "src/f"+strconv.Itoa(i)+".go", "package src\n")
+	}
+	writeFile(t, root, "src/main.rs", "fn main() {}\n")
+	writeFile(t, root, "AGENTS.md", strings.Repeat("line\n", 301))
+	if err := os.MkdirAll(filepath.Join(root, "dist"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	facts, err := Recommend(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantCaps := []string{
+		"token_optimized_shell", "github_context", "dependency_graph", "go_toolchain",
+		"javascript_toolchain", "versioned_documentation", "symbol_intelligence",
+		"semantic_retrieval", "general_context_compression", "structured_search_need",
+		"context_placement_pressure",
+	}
+	wantIDs := []string{
+		"rtk", "gh", "codegraph", "go", "node", "context7", "serena",
+		"semble", "headroom", "ast-grep", "",
+	}
+	if len(facts.Candidates) != len(wantCaps) {
+		t.Fatalf("expected %d candidates, got %d: %+v", len(wantCaps), len(facts.Candidates), facts.Candidates)
+	}
+	for i, candidate := range facts.Candidates {
+		if candidate.Capability != wantCaps[i] || candidate.CatalogID != wantIDs[i] {
+			t.Fatalf("candidate %d: capability=%q catalog=%q, want %q/%q", i, candidate.Capability, candidate.CatalogID, wantCaps[i], wantIDs[i])
 		}
 	}
 }

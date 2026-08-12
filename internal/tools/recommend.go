@@ -54,8 +54,10 @@ func Recommend(root string) (RecommendFacts, error) {
 	}
 	candidates := []Candidate{}
 	githubRemote := gitHubRemote(root)
-	if hasOutputDirs(root) {
-		candidates = append(candidates, candidate(caps, "token_optimized_shell", "RTK", "rtk", "build/test outputs are large", "output directories present", "large build/test outputs dominate shell output; RTK is a productivity candidate whose binary install is consent-gated and whose OpenCode global integration is a separate opt-in"))
+	// §15: RTK evidence must never rest only on dist/build/coverage; the
+	// trigger adds build/test-oriented package scripts and CI configuration.
+	if evidence := rtkEvidence(root, facts); evidence != "" {
+		candidates = append(candidates, candidate(caps, "token_optimized_shell", "RTK", "rtk", "rtk", evidence, "§15 evidence beyond dist/build/coverage (output directories, build/test-oriented scripts, CI) indicates shell-heavy workflows; RTK is a productivity candidate whose binary install is consent-gated and whose OpenCode global integration is a separate opt-in; output-volume verdicts remain model-owned"))
 	}
 	if githubRemote != "" {
 		candidates = append(candidates, candidate(caps, "github_context", "gh", "gh", "GitHub remote", githubRemote, "the repository declares a GitHub remote; gh is detectable and provides GitHub context"))
@@ -86,6 +88,26 @@ func Recommend(root string) (RecommendFacts, error) {
 	}
 	if hasOutputDirs(root) {
 		candidates = append(candidates, candidate(caps, "general_context_compression", "Headroom", "headroom", "context-compression pressure with RTK evidence", "output directories present alongside RTK evidence", "output-pressure signals coexist with RTK evidence; Headroom is a provider candidate without install/config/integration support and whether compression remains a problem is model-owned"))
+	}
+	// §46 structured_search_need: a large source surface makes structural
+	// search across files relevant; ast-grep is a productivity candidate and
+	// the model owns the Tool Budget decision.
+	if observed, ok := structuralSearchNeed(facts); ok {
+		candidates = append(candidates, candidate(caps, "structured_search_need", "ast-grep", "ast-grep", "structured_search_need", observed, "structural search across the source surface may help; ast-grep is a productivity candidate; the model owns the Tool Budget decision"))
+	}
+	// D3: an AGENTS.md above 300 lines indicates always-on context pressure;
+	// this candidate signals the model's placement decisions (COMPACT /
+	// EXTRACT_TO_SKILL / MOVE_TO_REFERENCE per the context-placement
+	// contract), never an install recommendation, so it carries no catalog
+	// entry and no capabilities truth.
+	if facts.AgentsMD != nil && facts.AgentsMD.Lines > 300 {
+		candidates = append(candidates, Candidate{
+			Capability: "context_placement_pressure",
+			Candidate:  "context-placement",
+			Signal:     "context_placement_pressure",
+			Observed:   "AGENTS.md: " + strconv.Itoa(facts.AgentsMD.Lines) + " lines",
+			Reason:     "an AGENTS.md above 300 lines indicates always-on context pressure; this signals the model's placement decisions (COMPACT / EXTRACT_TO_SKILL / MOVE_TO_REFERENCE per the context-placement contract), NOT an install recommendation",
+		})
 	}
 	return RecommendFacts{SchemaVersion: RecommendSchemaVersion, Candidates: candidates}, nil
 }
@@ -205,15 +227,68 @@ func itoa(n int) string {
 	return string(digits)
 }
 
-// hasOutputDirs reports build/test output directories commonly producing
-// large shell output.
-func hasOutputDirs(root string) bool {
+// outputDirs returns the build/test output directories present under root.
+func outputDirs(root string) []string {
+	dirs := []string{}
 	for _, dir := range []string{"dist", "build", "coverage"} {
 		if info, err := os.Stat(filepath.Join(root, dir)); err == nil && info.IsDir() {
-			return true
+			dirs = append(dirs, dir)
 		}
 	}
-	return false
+	return dirs
+}
+
+// hasOutputDirs reports whether build/test output directories commonly
+// producing large shell output are present.
+func hasOutputDirs(root string) bool {
+	return len(outputDirs(root)) > 0
+}
+
+// rtkScriptPrefixes are the §15 build/test-oriented package script name
+// prefixes indicating shell-heavy workflows; matching is case-insensitive.
+var rtkScriptPrefixes = []string{"build", "test", "check", "lint", "typecheck", "type-check", "e2e", "ci"}
+
+// rtkEvidence reports which deterministic §15 signals fired: build/test
+// output directories, build/test-oriented package scripts, and CI
+// configuration. Output-volume verdicts remain model-owned.
+func rtkEvidence(root string, facts inventory.Facts) string {
+	parts := []string{}
+	if dirs := outputDirs(root); len(dirs) > 0 {
+		parts = append(parts, "output_directories="+strings.Join(dirs, ","))
+	}
+	scripts := []string{}
+	for _, script := range facts.Scripts {
+		lower := strings.ToLower(script.Name)
+		for _, prefix := range rtkScriptPrefixes {
+			if strings.HasPrefix(lower, prefix) {
+				scripts = append(scripts, script.Name)
+				break
+			}
+		}
+	}
+	if len(scripts) > 0 {
+		parts = append(parts, "scripts="+strings.Join(scripts, ","))
+	}
+	if facts.CI.Present {
+		parts = append(parts, "ci="+strings.Join(facts.CI.Files, ","))
+	}
+	return strings.Join(parts, " ")
+}
+
+// structuralSearchNeed reports whether the repository reaches the §46
+// structured_search_need threshold (>=100 source files or >=300 total
+// files); the observed counts accompany the candidate as evidence only.
+func structuralSearchNeed(facts inventory.Facts) (string, bool) {
+	src := 0
+	for ext, count := range facts.Files.ByExtension {
+		if sourceExtensions[ext] {
+			src += count
+		}
+	}
+	if src >= 100 || facts.Files.Total >= 300 {
+		return fmt.Sprintf("source_files=%d files=%d", src, facts.Files.Total), true
+	}
+	return "", false
 }
 
 // gitHubRemote returns the GitHub remote URL when the repository has one.
