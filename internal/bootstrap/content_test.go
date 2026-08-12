@@ -813,6 +813,112 @@ func TestFullSuiteFrontmatterAndProgressiveDisclosure(t *testing.T) {
 	}
 }
 
+// TestFinalContextFixOutputContracts locks the final corrective contracts
+// (OPENCODE_AGENT_READY_FINAL_CONTEXT_FIX sections 3, 4, 6-7, 12): the
+// orchestrator Output Contract demands Repository / Context Placement /
+// Artifact Decisions / Tool / Capability Assessment / Checkpoint and gates
+// NO_ACTION behind the Context Placement Gate; artifact-design routes all
+// eleven verdicts explicitly; the repository profile and Boilerplate
+// Assessment contracts are present; RTK stays part of the assessment.
+func TestFinalContextFixOutputContracts(t *testing.T) {
+	orch := readAsset(t, "assets/skills/agent-ready-orchestrator/SKILL.md")
+	oc := "## Output Contract"
+	i := strings.Index(orch, oc)
+	if i < 0 {
+		t.Fatal("orchestrator missing " + oc)
+	}
+	contract := orch[i:]
+	for _, marker := range []string{
+		"Repository", "Context Placement", "Artifact Decisions",
+		"Tool / Capability Assessment", "Checkpoint",
+	} {
+		if !strings.Contains(contract, marker) {
+			t.Fatalf("orchestrator Output Contract missing %q", marker)
+		}
+	}
+	for _, marker := range []string{
+		"Repository Profile", "Context Placement Gate",
+		"Existing coverage alone is not sufficient for REUSE or NO_ACTION",
+		"repository kind classified", "relevant existing guidance evaluated",
+		"context placement evaluated", "no placement optimization justified",
+		"tool assessment completed", "no artifact candidate justified",
+	} {
+		if !strings.Contains(orch, marker) {
+			t.Fatalf("orchestrator missing NO_ACTION gate marker %q", marker)
+		}
+	}
+	auditFlow := readAsset(t, "assets/skills/agent-ready-orchestrator/references/audit-flow.md")
+	if !strings.Contains(auditFlow, "RTK") {
+		t.Fatal("audit-flow must keep evaluating RTK")
+	}
+	if !strings.Contains(auditFlow, "MUST NOT be emitted") {
+		t.Fatal("audit-flow must gate checkpoint completion on a recorded placement verdict")
+	}
+	if !strings.Contains(auditFlow, "MUST include Boilerplate Assessment") {
+		t.Fatal("audit-flow must require Boilerplate Assessment for starter/boilerplate/template kinds")
+	}
+
+	design := readAsset(t, "assets/skills/artifact-design/SKILL.md")
+	routing := regexp.MustCompile(`(?m)^([A-Z_]+)[^\n]*→`)
+	routed := map[string]bool{}
+	for _, m := range routing.FindAllStringSubmatch(design, -1) {
+		routed[m[1]] = true
+	}
+	for _, verb := range []string{
+		"CREATE", "UPDATE", "REUSE", "REMOVE", "COMPACT", "EXTRACT_TO_SKILL",
+		"MOVE_TO_REFERENCE", "REPLACE_WITH_SCRIPT", "REUSE_EXTERNAL_SKILL",
+		"NO_ACTION", "ASK_USER",
+	} {
+		if !routed[verb] {
+			t.Fatalf("artifact-design missing explicit routing for %s", verb)
+		}
+	}
+	for _, marker := range []string{"85", "never blocks", "placement transformations"} {
+		if !strings.Contains(design, marker) {
+			t.Fatalf("artifact-design missing threshold-scope marker %q", marker)
+		}
+	}
+
+	decisions := readAsset(t, "assets/skills/artifact-design/references/artifact-decisions.md")
+	for _, marker := range []string{
+		"its current context placement is appropriate",
+		"no justified placement transformation",
+		"passed the Context Placement Gate",
+		"tool assessment is complete",
+		"reduce permanent context",
+		"remove global invariants",
+	} {
+		if !strings.Contains(decisions, marker) {
+			t.Fatalf("artifact-decisions missing gate marker %q", marker)
+		}
+	}
+
+	analysis := readAsset(t, "assets/skills/repository-analysis/SKILL.md")
+	for _, marker := range []string{
+		"repository_profile", "primary", "secondary", "confidence",
+		"topology", "monorepo", "workspace_count", "existing_agent_assets",
+		"task_specific_candidates", "Boilerplate Assessment",
+		"extension points", "editable boundaries", "generated files",
+		"feature_addition_workflow", "variants", "scaffolding",
+		"upgrade_strategy", "canonical_customization_examples",
+		"repository-profile.yaml", "decisions.jsonl",
+	} {
+		if !strings.Contains(analysis, marker) {
+			t.Fatalf("repository-analysis missing profile marker %q", marker)
+		}
+	}
+
+	inventory := readAsset(t, "assets/skills/repository-analysis/references/inventory-facts.md")
+	for _, marker := range []string{
+		"topology", "monorepo", "workspace_count", "boilerplate_assessment",
+		"task_specific_candidates", "Go detects", "semantically",
+	} {
+		if !strings.Contains(inventory, marker) {
+			t.Fatalf("inventory-facts missing profile marker %q", marker)
+		}
+	}
+}
+
 // TestNoStaleToolScopePhrase locks the audit-evidence-gates stale-phrase
 // cleanup across the whole embedded asset tree: neither "tool management is
 // out of scope" nor its equivalent "Tool Manager is out of scope" may appear

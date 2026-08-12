@@ -179,6 +179,7 @@ func TestDrivenAudit(t *testing.T) {
 		t.Fatalf("audit did not write state decisions.jsonl: %v", err)
 	}
 	assertAuditStructure(t, events, auditDocument(events, baseline, after))
+	assertStateAfterAudit(t, repo)
 }
 
 // auditEvents is the structural view of the OpenCode JSONL event stream.
@@ -268,9 +269,12 @@ func auditDocument(events auditEvents, baseline, after map[string]string) string
 }
 
 // assertAuditStructure is the structural oracle: fact-helper use, completed
-// executions, and the mandatory categorized assessment with reasons. Model
-// verdicts (NO_ACTION vs candidates, scores, artifact choices) stay free.
-// Token matching is case-insensitive: models capitalize section headings.
+// executions, and the mandatory categorized assessment with reasons. It also
+// requires observable evidence of the V1 corrective contracts: Repository,
+// Context Placement, Artifact Decisions, and Checkpoint, plus an explicit RTK
+// evaluation inside Productivity. Model verdicts (NO_ACTION vs candidates,
+// scores, artifact choices) stay free. Token matching is case-insensitive:
+// models capitalize section headings.
 func assertAuditStructure(t *testing.T, events auditEvents, doc string) {
 	t.Helper()
 	if events.failed != "" {
@@ -283,6 +287,14 @@ func assertAuditStructure(t *testing.T, events auditEvents, doc string) {
 		t.Fatal("no agent-ready fact-helper use observed in JSONL events")
 	}
 	lower := strings.ToLower(doc)
+	for _, token := range []string{"repository", "context placement", "artifact", "checkpoint"} {
+		if !strings.Contains(lower, token) {
+			t.Fatalf("audit output missing structural token %q", token)
+		}
+	}
+	if !strings.Contains(lower, "rtk") {
+		t.Fatal("Productivity must explicitly evaluate RTK, even when NOT_JUSTIFIED")
+	}
 	for _, family := range []string{"ecosystem", "productivity", "provider"} {
 		if !strings.Contains(lower, family) {
 			t.Fatalf("Tool / Capability Assessment missing family %q", family)
@@ -294,5 +306,62 @@ func assertAuditStructure(t *testing.T, events auditEvents, doc string) {
 	}
 	if !strings.Contains(lower, "no_additional_tools") && !reasoned {
 		t.Fatal("assessment must contain recommendations with reasons or reasoned NO_ADDITIONAL_TOOLS")
+	}
+}
+
+// assertStateAfterAudit applies the state assertions after a completed audit:
+// the model must persist the repository profile with kind.primary and
+// kind.confidence before the run completes.
+func assertStateAfterAudit(t *testing.T, repo string) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(repo, ".agent-ready", "state", "repository-profile.yaml"))
+	if err != nil {
+		t.Fatalf("repository-profile.yaml not persisted after audit: %v", err)
+	}
+	lower := strings.ToLower(string(data))
+	for _, token := range []string{"kind", "primary", "confidence"} {
+		if !strings.Contains(lower, token) {
+			t.Fatalf("repository-profile.yaml missing %q", token)
+		}
+	}
+}
+
+// assertPlacementVerdictTraced applies the state assertion that a Context
+// Placement verdict is recorded when existing guidance informs the audit's
+// REUSE/NO_ACTION (or placement-transformation) conclusions.
+func assertPlacementVerdictTraced(t *testing.T, repo string) {
+	t.Helper()
+	var docs []string
+	for _, name := range []string{"decisions.jsonl", "repository-profile.yaml", "provenance.jsonl"} {
+		data, err := os.ReadFile(filepath.Join(repo, ".agent-ready", "state", name))
+		if err == nil {
+			docs = append(docs, strings.ToLower(string(data)))
+		}
+	}
+	joined := strings.Join(docs, "\n")
+	if !containsAny(joined, []string{"placement", "context placement", "verdict", "reuse", "no_action", "extract", "compact", "move", "replace_with_script"}) {
+		t.Fatal("Context Placement verdict must be recorded in state when existing guidance informs decisions")
+	}
+}
+
+// assertBoilerplateTraced applies the state assertion that the Boilerplate
+// Assessment is persisted or traceable in state/decisions/provenance when the
+// repository kind is starter/boilerplate/template.
+func assertBoilerplateTraced(t *testing.T, repo string) {
+	t.Helper()
+	var docs []string
+	for _, name := range []string{"repository-profile.yaml", "decisions.jsonl", "provenance.jsonl"} {
+		data, err := os.ReadFile(filepath.Join(repo, ".agent-ready", "state", name))
+		if err == nil {
+			docs = append(docs, strings.ToLower(string(data)))
+		}
+	}
+	joined := strings.Join(docs, "\n")
+	if !containsAny(joined, []string{
+		"extension points", "editable boundaries", "generated files",
+		"boilerplate_assessment", "feature_addition", "scaffold",
+		"upgrade strategy", "upgrade_strategy", "variants",
+	}) {
+		t.Fatal("boilerplate assessment must be persisted or traceable in state/decisions/provenance")
 	}
 }

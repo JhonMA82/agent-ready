@@ -58,15 +58,25 @@ func TestDrivenFixtures(t *testing.T) {
 	)
 	cohorts := []struct {
 		name     string
+		fixture  string // fixture path relative to testdata/acceptance; empty means driven/<name>
 		required []string
 	}{
-		{"nixos-wizard", []string{"rust", "cargo", "cargo.lock", "nix", "flake.lock", "ratatui", "0.29", "pnpm"}},
-		{"laravel", []string{"php", "laravel", "composer", "bun"}},
+		{"nixos-wizard", "", []string{"rust", "cargo", "cargo.lock", "nix", "flake.lock", "ratatui", "0.29", "pnpm"}},
+		{"laravel", "", []string{"php", "laravel", "composer", "bun"}},
+		// tanstack-starter reuses the existing acceptance fixture-q (tanstack-shadcn
+		// boilerplate); it is not duplicated under driven/. long-agents (fixture-r),
+		// short-optimal-agents (fixture-s) and deterministic-workflow (fixture-t) are
+		// likewise covered by the acceptance harness and have no driven duplicates.
+		{"tanstack-starter", "fixture-q", []string{"tanstack", "react", "shadcn", "npm", "screen"}},
 	}
 	for _, cohort := range cohorts {
 		t.Run(cohort.name, func(t *testing.T) {
 			repo := filepath.Join(base, "repo-"+cohort.name)
-			copyFixture(t, filepath.Join("testdata", "acceptance", "driven", cohort.name), repo)
+			src := filepath.Join("testdata", "acceptance", "driven", cohort.name)
+			if cohort.fixture != "" {
+				src = filepath.Join("testdata", "acceptance", cohort.fixture)
+			}
+			copyFixture(t, src, repo)
 			if out, err := exec.Command("git", "-C", repo, "init", "-q").CombinedOutput(); err != nil {
 				t.Fatalf("git init: %v: %s", err, out)
 			}
@@ -93,6 +103,7 @@ func TestDrivenFixtures(t *testing.T) {
 			}
 			doc := auditDocument(events, baseline, after)
 			assertAuditStructure(t, events, doc)
+			assertStateAfterAudit(t, repo)
 			lower := strings.ToLower(doc)
 			for _, token := range cohort.required {
 				if !strings.Contains(lower, token) {
@@ -100,6 +111,11 @@ func TestDrivenFixtures(t *testing.T) {
 				}
 			}
 			assertCohortOracle(t, cohort.name, lower, after)
+			switch cohort.name {
+			case "tanstack-starter":
+				assertPlacementVerdictTraced(t, repo)
+				assertBoilerplateTraced(t, repo)
+			}
 		})
 	}
 }
@@ -131,6 +147,47 @@ func assertCohortOracle(t *testing.T, mode, lower string, after map[string]strin
 		}
 		if !containsAny(lower, []string{"bun", "javascript", "node"}) {
 			t.Fatal("Laravel cohort must discuss the JS frontend alongside PHP")
+		}
+	case "tanstack-starter":
+		if !containsAny(lower, []string{"starter", "template", "boilerplate"}) {
+			t.Fatal("tanstack-starter must recognize starter/template/boilerplate kind")
+		}
+		if !strings.Contains(lower, "screen") {
+			t.Fatal("tanstack-starter must detect the screen workflow")
+		}
+		if !containsAny(lower, []string{"reuse", "extract", "move"}) || !strings.Contains(lower, "alternative") {
+			t.Fatal("tanstack-starter must evaluate REUSE vs EXTRACT_TO_SKILL vs MOVE_TO_REFERENCE")
+		}
+		if !strings.Contains(lower, "shadcn") || !containsAny(lower, []string{"external", "canonical"}) {
+			t.Fatal("tanstack-starter must recognize the canonical external shadcn skill")
+		}
+		if !containsAny(lower, []string{"generate-routes", "generate_routes", "generate:routes"}) {
+			t.Fatal("tanstack-starter must recognize route generation as a script")
+		}
+		for _, tool := range []string{"rtk", "context7", "semble", "serena", "codegraph", "headroom"} {
+			if !strings.Contains(lower, tool) {
+				t.Fatalf("tanstack-starter must evaluate tool %q", tool)
+			}
+		}
+		if containsAny(lower, []string{"no_action", "no action"}) && !containsAny(lower, []string{"boilerplate", "extension", "generated files", "scaffold", "upgrade"}) {
+			t.Fatal("tanstack-starter NO_ACTION requires the boilerplate assessment to be complete")
+		}
+		rejectSkillPaths(t, after, []string{"react", "tanstack", "shadcn", "route", "preset"})
+	}
+}
+
+// rejectSkillPaths fails when a cohort created a skill artifact whose path
+// matches one of the forbidden needles (generic or redundant artifacts).
+func rejectSkillPaths(t *testing.T, after map[string]string, needles []string) {
+	t.Helper()
+	for path := range after {
+		if !strings.HasPrefix(path, ".opencode/skills/") {
+			continue
+		}
+		for _, needle := range needles {
+			if strings.Contains(strings.ToLower(path), needle) {
+				t.Fatalf("cohort created a redundant skill artifact: %s", path)
+			}
 		}
 	}
 }

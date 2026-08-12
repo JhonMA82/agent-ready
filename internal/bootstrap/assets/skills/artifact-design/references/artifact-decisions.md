@@ -8,9 +8,9 @@ The eleven decision verbs of the audit loop. Read this reference when a decision
 |---|---|---|
 | CREATE | Author a new skill with skill-creator | Labeled evidence + rubric score >= 85 |
 | UPDATE | Revise an existing skill for changed evidence | Changed evidence; no full re-author |
-| REUSE | An existing skill already covers the need | Evidence the coverage exists AND placement is optimal |
+| REUSE | Use when existing guidance/artifact/skill already covers the need AND its current context placement is appropriate | Evidence the coverage exists AND placement passes the Context Placement Gate |
 | REMOVE | Drop a shipped skill (sync scope only) | Evidence the skill no longer applies; approval flows (MERGE/DEPRECATE/REMOVE) are out of scope |
-| NO_ACTION | No evidence-supported artifact exists | Scored candidates, all below threshold |
+| NO_ACTION | No justified CREATE/UPDATE/REMOVE AND no justified placement transformation AND relevant existing guidance passed the Context Placement Gate AND tool assessment is complete | Scored candidates, all below threshold; placement gate passed; tool assessment complete |
 | ASK_USER | Stop and request missing context | Named unknown only the user can resolve |
 | COMPACT | Keep the same artifact, reduce permanent context | Existing artifact carries more always-on weight than its frequency justifies |
 | EXTRACT_TO_SKILL | Move a task-specific procedure from AGENTS/docs into a skill | Task-specific + procedural + repeatable + repository-specific guidance; router left in the source |
@@ -114,8 +114,8 @@ Answer these six with evidence before concluding REUSE on existing guidance:
 2. Is it task-specific?
 3. Is it procedural?
 4. Is it too detailed for always-on context?
-5. Would extraction reduce token cost?
-6. Would extraction harm discoverability?
+5. Would extraction reduce permanent context?
+6. Would extraction reduce discoverability or remove global invariants?
 
 ## Seven questions (decision gate)
 

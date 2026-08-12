@@ -30,7 +30,7 @@ Before returning from `sync`, confirm every item:
 5. Research: close evidence gaps with targeted-research (read `references/audit-flow.md`).
 6. Ask: when only the user can resolve an unknown, stop with ASK_USER (read `references/stop-conditions.md`).
 7. Confidence: record confidence with every decision; label each artifact with its evidence.
-8. Context placement: when guidance already exists, evaluate its placement before any REUSE conclusion — is this guidance always applicable; is it task-specific; is it procedural; is it too detailed for always-on context; would extraction reduce token cost; would extraction harm discoverability?
+8. Context placement: when guidance already exists, evaluate its placement before any REUSE conclusion — is this guidance always applicable; is it task-specific; is it procedural; is it too detailed for always-on context; would extraction reduce token cost; would extraction harm discoverability? Record the placement verdict in state (decisions.jsonl) before concluding REUSE or NO_ACTION.
 9. Artifact value: propose only evidence-backed artifacts and record avoided ones; when nothing scores above threshold, return NO_ACTION and create nothing.
 10. Review: gate every candidate with skill-reviewer before creation.
 11. Stop: apply the stop conditions and checkpoint the completed stage.
@@ -43,6 +43,30 @@ Before returning from `sync`, confirm every item:
 - Every successful audit MUST end with a Tool / Capability Assessment that names all three families verbatim — ecosystem, productivity, provider — each with observed evidence and a reason, or `NO_ADDITIONAL_TOOLS` with a reason; never omit or abbreviate a family.
 - Apply the Tool Budget minimal-set ordering: rg + fd + jq; then + ast-grep when structural search is needed; then Semble OR Serena when semantic retrieval or navigation is justified; CodeGraph only when the graph capability adds clear value; Headroom only when context compression remains a measured problem. Heavier tools need explicit justification; the final set stays model-owned.
 - Coverage is not sufficient to conclude REUSE: evaluate context placement before final artifact decisions.
+- Existing coverage alone is not sufficient for REUSE or NO_ACTION: existing guidance must also pass the Context Placement Gate.
 
 ## Output Contract
-Return the mode outcome, the recorded decisions with evidence and confidence, the Tool / Capability Assessment naming ecosystem, productivity, and provider, and the checkpoint stage. Resume rules govern the next run (read `references/resume-rules.md`).
+Return the mode outcome, the recorded decisions with evidence and confidence, the Tool / Capability Assessment naming ecosystem, productivity, and provider, and the checkpoint stage. Every audit output MUST demonstrate, with labeled evidence:
+
+```text
+Repository Profile
+Context Placement
+Artifact Decisions
+Tool / Capability Assessment
+Checkpoint
+```
+
+Before returning `NO_ACTION`, all of the following must hold:
+
+```text
+repository kind classified
+relevant existing guidance evaluated
+context placement evaluated
+no placement optimization justified
+tool assessment completed
+no artifact candidate justified
+```
+
+Existing coverage alone is not sufficient for REUSE or NO_ACTION. Existing guidance must also pass the Context Placement Gate.
+
+Resume rules govern the next run (read `references/resume-rules.md`).

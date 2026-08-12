@@ -86,3 +86,26 @@ Agent-Ready optimizes both content and its distribution between always-on and on
 ## Token estimates
 
 Never claim exact token savings unless measured. Use qualitative classes (VERY_LOW, LOW, MEDIUM, HIGH, VERY_HIGH), for example `expected permanent context reduction: MEDIUM`.
+
+## Checkpoint gate
+
+`checkpoint --complete` MUST NOT be emitted when:
+
+```text
+relevant existing guidance was used to justify
+REUSE or NO_ACTION
+
+AND
+
+no Context Placement verdict was recorded.
+```
+
+If repository kind is:
+
+```text
+starter
+boilerplate
+template
+```
+
+then the Repository output MUST include Boilerplate Assessment.

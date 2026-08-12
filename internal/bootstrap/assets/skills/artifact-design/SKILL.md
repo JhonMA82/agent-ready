@@ -27,7 +27,25 @@ Before any decision, answer all seven with evidence: is it repository-specific; 
 1. Collect the labeled evidence set for the current decision point.
 2. Choose the decision output — CREATE, UPDATE, REUSE, NO_ACTION, or ASK_USER (REMOVE is sync-scope only), plus the placement verbs COMPACT, EXTRACT_TO_SKILL, MOVE_TO_REFERENCE, REPLACE_WITH_SCRIPT, or REUSE_EXTERNAL_SKILL — per `references/artifact-decisions.md`.
 3. Record the decision, its evidence, and confidence in state.
-4. Route the outcome: CREATE/UPDATE to proposal, NO_ACTION to stop, ASK_USER to the user.
+4. Route the outcome per Verdict Routing: CREATE/UPDATE to proposal, REUSE to a persisted placement verdict, NO_ACTION to stop only after the Context Placement Gate, ASK_USER to the user.
+
+## Verdict Routing
+
+```text
+CREATE → proposal/review
+UPDATE → proposal/review
+REUSE → persist placement verdict
+REMOVE → proposal/review
+COMPACT → proposal/review
+EXTRACT_TO_SKILL → skill-creator → skill-reviewer → proposal/review
+MOVE_TO_REFERENCE → proposal/review
+REPLACE_WITH_SCRIPT → deterministic artifact proposal → review
+REUSE_EXTERNAL_SKILL → persist external coverage decision
+NO_ACTION → only after Context Placement Gate
+ASK_USER → stop and ask
+```
+
+The rubric threshold >= 85 only controls the creation of new skills. It never blocks the placement transformations COMPACT, EXTRACT_TO_SKILL, MOVE_TO_REFERENCE, or REPLACE_WITH_SCRIPT: those route through their own transformations above, not through skill creation.
 
 ## Output Contract
 Return the decision with its evidence and confidence, plus the recorded state entry; never a bare artifact count.

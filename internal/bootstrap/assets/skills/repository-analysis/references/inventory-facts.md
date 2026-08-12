@@ -24,14 +24,17 @@ How to gather the deterministic evidence base. Read this reference when explorat
 
 ## repository_profile contract
 
-Build the repository profile with these fields:
+Build the repository profile with these fields. Go detects the deterministic facts; the model classifies semantically (kind, confidence, placement candidates):
 
 ```yaml
 repository_profile:
   kind:
-    primary: boilerplate | starter | template | application
+    primary: application | library | cli | starter | boilerplate | template | infrastructure | mixed
     secondary: []
     confidence: <0.0-1.0>
+  topology:
+    monorepo: <true | false>
+    workspace_count: <int>
   ecosystems: []
   central_frameworks: []
   existing_agent_assets:
@@ -40,15 +43,16 @@ repository_profile:
     external_skills: []
     scripts: []
   context_placement:
-    always_on_estimate: <qualitative>
-    task_specific_guidance_candidates: []
+    always_on: []
+    task_specific_candidates: []
   tool_assessment:
     ecosystem: []
     productivity: []
     providers: []
+  boilerplate_assessment: <only when kind.primary is starter/boilerplate/template>
 ```
 
-Kind and confidence are classified per the repository-analysis skill (boilerplate/starter/template trigger the boilerplate audit).
+`monorepo` is a topology fact, never an identity: express it as `topology.monorepo: true` and still classify a primary kind. Kind and confidence are classified per the repository-analysis skill (boilerplate/starter/template trigger the Boilerplate Assessment). The Boilerplate Assessment contract (extension points, editable boundaries, generated files, feature addition workflow, variants, scaffolding, upgrade strategy, canonical customization examples) is defined in the repository-analysis skill; it is persisted in the repository profile and decisions.jsonl and creates no artifacts.
 
 ## Frequency discipline
 
