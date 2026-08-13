@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Every entry below is cross-checked against the repository commit history; the **Covered commits** line under each release lists the commits that introduced the described behavior. Release tags follow the goreleaser `v*` filter (`goreleaser.yml` → `release`). The V1 close is additionally checkpointed by `v1.0.0-facts` and `v1.0.0-sync-contract`; the final `v1.0.0` tag marks the archived, verified release.
 
+## [v1.1.1] - 2026-08-12
+
+Surgical output-contract test fix per `OPENCODE_AGENT_READY_SURGICAL_OUTPUT_TEST_FIX.md`: the driven audit and fixture oracles no longer let persisted state satisfy the visible output contract, and the placement/boilerplate assertions are structural.
+
+**Covered commits**: `b14e960`, `7c5f918`, `b6194ce`
+
+### Fixed
+
+- **Visible output contract enforced over the OpenCode text stream only** — the driven audit and fixture oracles no longer concatenate persisted state with visible output; `Repository`, `Context Placement`, `Artifact Decisions`, `Tool / Capability Assessment`, and `Checkpoint` must appear in the visible response, and persisted files cannot make a visible-output test pass (`b14e960`).
+- **Structural Context Placement evidence** — persisted verdicts must be a `decisions.jsonl` record identifiable as the `context_placement` stage/type carrying a subject, decision/verdict, and reason/evidence; a bare `{"decision":"NO_ACTION"}` no longer satisfies the assertion (`b14e960`).
+- **Structural Boilerplate Assessment** — starter/boilerplate/template repositories must persist the assessment covering extension points, editable boundaries, generated files, feature-addition workflow, and upgrade strategy; `not_found` statuses are valid, absence is not (`b14e960`).
+- **NO_ACTION no longer implied by a threshold miss** — the `>=85` rubric threshold governs new-skill creation only; `NO_ACTION` requires no justified artifact change, no justified context-placement transformation, and a complete tool/capability assessment (`7c5f918`).
+- **REUSE requires appropriate placement** — REUSE means existing guidance/artifact/skill covers the need AND its current context placement is appropriate (`7c5f918`).
+
 ## [v1.1.0] - 2026-08-12
 
 Context placement refinement (placement signals, fixtures q-u) plus the final corrective output contracts per `OPENCODE_AGENT_READY_FINAL_CONTEXT_FIX.md`: mandatory Repository Profile, Context Placement and Boilerplate Assessment evidence before REUSE/NO_ACTION.
@@ -92,6 +106,8 @@ Initial public release: CLI foundation, docs, and installer.
 
 ---
 
+[v1.1.1]: https://github.com/JhonMA82/agent-ready/releases/tag/v1.1.1
+[v1.1.0]: https://github.com/JhonMA82/agent-ready/releases/tag/v1.1.0
 [v1.0.0]: https://github.com/JhonMA82/agent-ready/releases/tag/v1.0.0
 [v0.1.1]: https://github.com/JhonMA82/agent-ready/releases/tag/v0.1.1
 [v0.1.0]: https://github.com/JhonMA82/agent-ready/releases/tag/v0.1.0
