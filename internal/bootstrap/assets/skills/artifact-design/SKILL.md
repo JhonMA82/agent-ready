@@ -9,7 +9,7 @@ Run when the loop reaches the artifact_decisions stage or when new evidence chan
 
 ## Hard Rules
 - Decide from labeled evidence only; an evidence-backed request precedes any artifact.
-- NO_ACTION is a first-class decision: nothing scoring below threshold means nothing is created.
+- NO_ACTION is a first-class decision: the >=85 threshold governs NEW SKILL creation only. A candidate below the new-skill threshold may still justify COMPACT, EXTRACT_TO_SKILL (when extracting existing repository guidance), MOVE_TO_REFERENCE, REPLACE_WITH_SCRIPT, UPDATE, or REMOVE. NO_ACTION is valid only when no artifact or placement transformation is justified.
 - No artifact spam: prefer REUSE over CREATE, keep the artifact set minimal, and record avoided artifacts.
 - Never propose an artifact on UNKNOWN-only evidence; gather more or stop with ASK_USER.
 - Surface conflicts, never hide them: conflicting package-manager or ecosystem evidence is named with the decision, and migration is proposed, never stated as fact.

@@ -31,7 +31,7 @@ Before returning from `sync`, confirm every item:
 6. Ask: when only the user can resolve an unknown, stop with ASK_USER (read `references/stop-conditions.md`).
 7. Confidence: record confidence with every decision; label each artifact with its evidence.
 8. Context placement: when guidance already exists, evaluate its placement before any REUSE conclusion — is this guidance always applicable; is it task-specific; is it procedural; is it too detailed for always-on context; would extraction reduce token cost; would extraction harm discoverability? Record the placement verdict in state (decisions.jsonl) before concluding REUSE or NO_ACTION.
-9. Artifact value: propose only evidence-backed artifacts and record avoided ones; when nothing scores above threshold, return NO_ACTION and create nothing.
+9. Artifact value: propose only evidence-backed artifacts and record avoided ones; when no new-skill candidate clears its threshold AND no other artifact change or context-placement transformation is justified, return NO_ACTION.
 10. Review: gate every candidate with skill-reviewer before creation.
 11. Stop: apply the stop conditions and checkpoint the completed stage.
 
