@@ -86,7 +86,6 @@ func TestDrivenFixtures(t *testing.T) {
 			if out, code := runCommand(t, binary, repo, env, "init", "--json"); code != 0 {
 				t.Fatalf("init: code=%d %s", code, out)
 			}
-			baseline := snapshot(t, repo)
 			ctx, cancel := context.WithTimeout(context.Background(), 9*time.Minute)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, "opencode", "run", "--dir", repo, "--model", model,
@@ -101,21 +100,18 @@ func TestDrivenFixtures(t *testing.T) {
 			if data, err := os.ReadFile(filepath.Join(repo, ".agent-ready", "state", "decisions.jsonl")); err != nil || len(data) == 0 {
 				t.Fatalf("audit did not write state decisions.jsonl: %v", err)
 			}
-			doc := auditDocument(events, baseline, after)
-			assertAuditStructure(t, events, doc)
-			assertStateAfterAudit(t, repo)
-			lower := strings.ToLower(doc)
+			// Visible output assertions and state persistence assertions are
+			// kept apart: persisted files never satisfy the visible oracle.
+			visible := events.text.String()
+			assertAuditStructure(t, events, visible)
+			assertPersistedAuditState(t, repo)
+			lower := strings.ToLower(visible)
 			for _, token := range cohort.required {
 				if !strings.Contains(lower, token) {
 					t.Fatalf("cohort %s missing structural token %q", cohort.name, token)
 				}
 			}
 			assertCohortOracle(t, cohort.name, lower, after)
-			switch cohort.name {
-			case "tanstack-starter":
-				assertPlacementVerdictTraced(t, repo)
-				assertBoilerplateTraced(t, repo)
-			}
 		})
 	}
 }

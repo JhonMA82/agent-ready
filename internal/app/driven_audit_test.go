@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -88,10 +89,12 @@ func TestDrivenAuditGitSelectors(t *testing.T) {
 
 // TestDrivenAudit drives the installed command through real OpenCode in an
 // isolated temporary Git repository and observes the audit through JSONL
-// events and newly written state. The structural oracle requires fact-helper
-// use and the mandatory categorized Tool / Capability Assessment (ecosystem,
-// productivity, provider) with evidence and reasons, or a reasoned
-// NO_ADDITIONAL_TOOLS. It never prescribes model-owned verdicts.
+// events and newly written state. The visible oracle requires fact-helper
+// use, the mandatory categorized Tool / Capability Assessment (ecosystem,
+// productivity, provider) with evidence and reasons or a reasoned
+// NO_ADDITIONAL_TOOLS, and the V1 corrective output sections — all over the
+// OpenCode text stream only; persisted state is asserted separately and never
+// satisfies the visible contract. It never prescribes model-owned verdicts.
 func TestDrivenAudit(t *testing.T) {
 	if testing.Short() {
 		t.Skip("driven audit executes the real OpenCode runtime")
@@ -162,8 +165,6 @@ func TestDrivenAudit(t *testing.T) {
 	if after, err := os.ReadFile(global); err != nil || !bytes.Equal(after, globalBytes) {
 		t.Fatalf("init modified the global OpenCode config: %v\n%s", err, after)
 	}
-	baseline := snapshot(t, repo)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 9*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "opencode", "run", "--dir", repo, "--model", model,
@@ -174,12 +175,13 @@ func TestDrivenAudit(t *testing.T) {
 		t.Fatalf("opencode run: %v\n%s", err, out)
 	}
 	events := observeAuditJSONL(t, out)
-	after := snapshot(t, repo)
 	if data, err := os.ReadFile(filepath.Join(repo, ".agent-ready", "state", "decisions.jsonl")); err != nil || len(data) == 0 {
 		t.Fatalf("audit did not write state decisions.jsonl: %v", err)
 	}
-	assertAuditStructure(t, events, auditDocument(events, baseline, after))
-	assertStateAfterAudit(t, repo)
+	// The visible output contract is asserted over the OpenCode text stream
+	// only; persisted state is asserted separately and never satisfies it.
+	assertAuditStructure(t, events, events.text.String())
+	assertPersistedAuditState(t, repo)
 }
 
 // auditEvents is the structural view of the OpenCode JSONL event stream.
@@ -268,14 +270,14 @@ func auditDocument(events auditEvents, baseline, after map[string]string) string
 	return doc
 }
 
-// assertAuditStructure is the structural oracle: fact-helper use, completed
-// executions, and the mandatory categorized assessment with reasons. It also
-// requires observable evidence of the V1 corrective contracts: Repository,
-// Context Placement, Artifact Decisions, and Checkpoint, plus an explicit RTK
-// evaluation inside Productivity. Model verdicts (NO_ACTION vs candidates,
-// scores, artifact choices) stay free. Token matching is case-insensitive:
-// models capitalize section headings.
-func assertAuditStructure(t *testing.T, events auditEvents, doc string) {
+// assertAuditStructure is the structural oracle over the visible OpenCode
+// text: fact-helper use, completed executions, and the mandatory categorized
+// assessment with reasons, plus observable evidence of the V1 corrective
+// contracts: Repository, Context Placement, Artifact Decisions, Tool /
+// Capability Assessment, and Checkpoint, with an explicit RTK evaluation
+// inside Productivity. Model verdicts (NO_ACTION vs candidates, scores,
+// artifact choices) stay free.
+func assertAuditStructure(t *testing.T, events auditEvents, visible string) {
 	t.Helper()
 	if events.failed != "" {
 		t.Fatalf("audit failed: %s", events.failed)
@@ -286,20 +288,50 @@ func assertAuditStructure(t *testing.T, events auditEvents, doc string) {
 	if len(events.helpers) == 0 {
 		t.Fatal("no agent-ready fact-helper use observed in JSONL events")
 	}
-	lower := strings.ToLower(doc)
-	for _, token := range []string{"repository", "context placement", "artifact", "checkpoint"} {
+	assertVisibleAuditOutput(t, visible)
+}
+
+// visibleAuditRequirements are the tokens the visible OpenCode output MUST
+// demonstrate per the V1 output contract: the five mandatory sections, the
+// three tool families, and an explicit RTK evaluation. Token matching is
+// case-insensitive because models capitalize section headings.
+var visibleAuditRequirements = []string{
+	"repository",
+	"context placement",
+	"artifact",
+	"tool",
+	"checkpoint",
+	"ecosystem",
+	"productivity",
+	"provider",
+	"rtk",
+}
+
+// missingVisibleAuditTokens returns the output-contract tokens absent from
+// the visible OpenCode text. Persisted state never contributes here: a run
+// whose visible output omits Repository or Context Placement fails even when
+// state carries that data.
+func missingVisibleAuditTokens(visible string) []string {
+	lower := strings.ToLower(visible)
+	var missing []string
+	for _, token := range visibleAuditRequirements {
 		if !strings.Contains(lower, token) {
-			t.Fatalf("audit output missing structural token %q", token)
+			missing = append(missing, token)
 		}
 	}
-	if !strings.Contains(lower, "rtk") {
-		t.Fatal("Productivity must explicitly evaluate RTK, even when NOT_JUSTIFIED")
+	return missing
+}
+
+// assertVisibleAuditOutput is the visible-only structural oracle: the
+// mandatory sections and the categorized Tool / Capability Assessment with
+// reasons must appear in the text OpenCode actually sent. It never reads
+// persisted files. No specific RTK verdict is required.
+func assertVisibleAuditOutput(t *testing.T, visible string) {
+	t.Helper()
+	if missing := missingVisibleAuditTokens(visible); len(missing) > 0 {
+		t.Fatalf("visible audit output missing structural tokens %v", missing)
 	}
-	for _, family := range []string{"ecosystem", "productivity", "provider"} {
-		if !strings.Contains(lower, family) {
-			t.Fatalf("Tool / Capability Assessment missing family %q", family)
-		}
-	}
+	lower := strings.ToLower(visible)
 	reasoned := strings.Contains(lower, "reason") || strings.Contains(lower, "because") || strings.Contains(lower, "warrant")
 	if strings.Contains(lower, "no_additional_tools") && !reasoned {
 		t.Fatal("NO_ADDITIONAL_TOOLS must carry a reason")
@@ -309,9 +341,9 @@ func assertAuditStructure(t *testing.T, events auditEvents, doc string) {
 	}
 }
 
-// assertStateAfterAudit applies the state assertions after a completed audit:
-// the model must persist the repository profile with kind.primary and
-// kind.confidence before the run completes.
+// assertStateAfterAudit applies the repository profile assertion after a
+// completed audit: the model must persist the repository profile with
+// kind.primary and kind.confidence before the run completes.
 func assertStateAfterAudit(t *testing.T, repo string) {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(repo, ".agent-ready", "state", "repository-profile.yaml"))
@@ -326,42 +358,322 @@ func assertStateAfterAudit(t *testing.T, repo string) {
 	}
 }
 
-// assertPlacementVerdictTraced applies the state assertion that a Context
-// Placement verdict is recorded when existing guidance informs the audit's
-// REUSE/NO_ACTION (or placement-transformation) conclusions.
-func assertPlacementVerdictTraced(t *testing.T, repo string) {
+// assertPersistedAuditState applies the persisted-state assertions after a
+// completed audit, each layer validated on its own: repository profile,
+// decisions, checkpoint, and — when the run's evidence makes them applicable
+// — the Context Placement verdict and the Boilerplate Assessment. Persisted
+// files never satisfy the visible output contract, which is asserted
+// separately over the OpenCode text only.
+func assertPersistedAuditState(t *testing.T, repo string) {
 	t.Helper()
-	var docs []string
-	for _, name := range []string{"decisions.jsonl", "repository-profile.yaml", "provenance.jsonl"} {
-		data, err := os.ReadFile(filepath.Join(repo, ".agent-ready", "state", name))
-		if err == nil {
-			docs = append(docs, strings.ToLower(string(data)))
-		}
+	assertStateAfterAudit(t, repo)
+	if data, err := os.ReadFile(filepath.Join(repo, ".agent-ready", "state", "decisions.jsonl")); err != nil || len(data) == 0 {
+		t.Fatalf("audit did not persist state decisions.jsonl: %v", err)
 	}
-	joined := strings.Join(docs, "\n")
-	if !containsAny(joined, []string{"placement", "context placement", "verdict", "reuse", "no_action", "extract", "compact", "move", "replace_with_script"}) {
-		t.Fatal("Context Placement verdict must be recorded in state when existing guidance informs decisions")
+	if _, err := os.Stat(filepath.Join(repo, ".agent-ready", "checkpoints", "latest.json")); err != nil {
+		t.Fatalf("audit did not persist checkpoint latest.json: %v", err)
+	}
+	if hasExistingGuidance(t, repo) {
+		assertContextPlacementPersisted(t, repo)
+	}
+	assertBoilerplatePersisted(t, repo)
+}
+
+// hasExistingGuidance reports whether the repository carries existing
+// guidance (AGENTS.md or installed local skills) that a REUSE/NO_ACTION
+// conclusion must evaluate before persisting a Context Placement verdict.
+func hasExistingGuidance(t *testing.T, repo string) bool {
+	t.Helper()
+	if _, err := os.Stat(filepath.Join(repo, "AGENTS.md")); err == nil {
+		return true
+	}
+	if _, err := os.Stat(filepath.Join(repo, ".opencode", "skills")); err == nil {
+		return true
+	}
+	return false
+}
+
+// assertContextPlacementPersisted requires structural Context Placement
+// evidence in decisions.jsonl: a record identifiable as the context_placement
+// stage/type and carrying a subject, a decision/verdict, and a reason or
+// evidence. A bare {"decision":"NO_ACTION"} never satisfies it.
+func assertContextPlacementPersisted(t *testing.T, repo string) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(repo, ".agent-ready", "state", "decisions.jsonl"))
+	if err != nil {
+		t.Fatalf("decisions.jsonl not persisted: %v", err)
+	}
+	if err := contextPlacementEvidence(data); err != nil {
+		t.Fatal(err)
 	}
 }
 
-// assertBoilerplateTraced applies the state assertion that the Boilerplate
-// Assessment is persisted or traceable in state/decisions/provenance when the
-// repository kind is starter/boilerplate/template.
-func assertBoilerplateTraced(t *testing.T, repo string) {
-	t.Helper()
-	var docs []string
-	for _, name := range []string{"repository-profile.yaml", "decisions.jsonl", "provenance.jsonl"} {
-		data, err := os.ReadFile(filepath.Join(repo, ".agent-ready", "state", name))
-		if err == nil {
-			docs = append(docs, strings.ToLower(string(data)))
+// contextPlacementEvidence reports whether data contains a Context Placement
+// record per the project's JSONL contract: identifiable by a stage/type
+// (kind/category) value of context_placement and carrying a subject (subject
+// or artifact), a verdict (decision, verdict, or action), and a reason or
+// evidence. It returns nil only for a complete structural record.
+func contextPlacementEvidence(data []byte) error {
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var rec map[string]any
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			continue
+		}
+		if !recordIdentifiesPlacement(rec) {
+			continue
+		}
+		if !recordHasField(rec, "subject", "artifact") || !recordHasField(rec, "decision", "verdict", "action") || !recordHasField(rec, "reason", "evidence") {
+			return errors.New("context_placement record found but incomplete: needs subject, decision/verdict, and reason/evidence")
+		}
+		return nil
+	}
+	return errors.New("no record identified as context_placement (stage/type == context_placement) with subject, verdict, and reason/evidence in decisions.jsonl")
+}
+
+func recordIdentifiesPlacement(rec map[string]any) bool {
+	for _, key := range []string{"stage", "type", "kind", "category"} {
+		if v, ok := rec[key].(string); ok && strings.EqualFold(v, "context_placement") {
+			return true
 		}
 	}
-	joined := strings.Join(docs, "\n")
-	if !containsAny(joined, []string{
-		"extension points", "editable boundaries", "generated files",
-		"boilerplate_assessment", "feature_addition", "scaffold",
-		"upgrade strategy", "upgrade_strategy", "variants",
-	}) {
-		t.Fatal("boilerplate assessment must be persisted or traceable in state/decisions/provenance")
+	return false
+}
+
+func recordHasField(rec map[string]any, keys ...string) bool {
+	for _, key := range keys {
+		if v, ok := rec[key].(string); ok && strings.TrimSpace(v) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// boilerplateAssessmentKeys are the evaluation dimensions the Boilerplate
+// Assessment must demonstrate when the repository kind is
+// starter/boilerplate/template. No positive finding is required: each
+// dimension may be assessed, partial, or not_found; the evaluation itself
+// must be demonstrable.
+var boilerplateAssessmentKeys = []string{
+	"extension_points",
+	"editable_boundaries",
+	"generated_files",
+	"feature_addition_workflow",
+	"upgrade_strategy",
+}
+
+// boilerplateAssessmentGaps returns the required assessment dimensions absent
+// from a repository profile. When the profile classifies kind.primary as
+// starter/boilerplate/template, the structured assessment must be present.
+func boilerplateAssessmentGaps(profile string) []string {
+	lower := strings.ToLower(profile)
+	marker := "boilerplate_assessment"
+	idx := strings.Index(lower, marker)
+	if idx < 0 {
+		return append([]string(nil), boilerplateAssessmentKeys...)
+	}
+	section := lower[idx+len(marker):]
+	if nl := strings.IndexByte(section, '\n'); nl >= 0 {
+		section = section[nl+1:]
+	}
+	seen := map[string]bool{}
+	for _, line := range strings.Split(section, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		hasKey := false
+		for _, key := range boilerplateAssessmentKeys {
+			if strings.Contains(line, key) {
+				seen[key] = true
+				hasKey = true
+			}
+		}
+		if line == trimmed && !hasKey { // next top-level key ends the section
+			break
+		}
+	}
+	var missing []string
+	for _, key := range boilerplateAssessmentKeys {
+		if !seen[key] {
+			missing = append(missing, key)
+		}
+	}
+	return missing
+}
+
+// profilePrimaryKind extracts the repository profile's kind.primary value.
+func profilePrimaryKind(profile string) string {
+	m := primaryKindRE.FindStringSubmatch(profile)
+	if m == nil {
+		return ""
+	}
+	return strings.ToLower(m[1])
+}
+
+// primaryKindRE matches the profile's `primary: <kind>` line.
+var primaryKindRE = regexp.MustCompile(`(?im)^\s*primary\s*:\s*([a-z_/\-]+)`)
+
+// kindRequiresBoilerplate reports whether a primary kind triggers the
+// Boilerplate Assessment contract (starter/boilerplate/template).
+func kindRequiresBoilerplate(kind string) bool {
+	for _, k := range []string{"starter", "boilerplate", "template"} {
+		if strings.Contains(kind, k) {
+			return true
+		}
+	}
+	return false
+}
+
+// assertBoilerplatePersisted requires the structured Boilerplate Assessment
+// in persisted state when the classified kind is starter/boilerplate/template.
+// The assessment may live in the repository profile (contract location) or
+// the model-owned decisions record; each dimension may report not_found.
+func assertBoilerplatePersisted(t *testing.T, repo string) {
+	t.Helper()
+	var profile string
+	if data, err := os.ReadFile(filepath.Join(repo, ".agent-ready", "state", "repository-profile.yaml")); err == nil {
+		profile = string(data)
+	}
+	if !kindRequiresBoilerplate(profilePrimaryKind(profile)) {
+		return // not applicable
+	}
+	if missing := boilerplateAssessmentGaps(profile); len(missing) == 0 {
+		return
+	}
+	if data, err := os.ReadFile(filepath.Join(repo, ".agent-ready", "state", "decisions.jsonl")); err == nil {
+		if missing := boilerplateAssessmentGaps(string(data)); len(missing) == 0 {
+			return
+		}
+	}
+	t.Fatalf("starter/boilerplate/template repository lacks a structured boilerplate assessment (dimensions: %v) in persisted state", boilerplateAssessmentKeys)
+}
+
+// TestVisibleAuditContractIsVisibleOnly guards the false-positive class the
+// patch removes: persisted state must never satisfy the visible output
+// contract. A visible response that omits Repository and Context Placement
+// must fail even when state would carry that data (§10).
+func TestVisibleAuditContractIsVisibleOnly(t *testing.T) {
+	visible := `Outcome: NO_ACTION
+
+Artifact Decisions:
+  REUSE existing AGENTS guidance
+
+Tool / Capability Assessment:
+  ecosystem: go, node
+  productivity: rg, fd, jq, RTK NOT_JUSTIFIED
+  provider: none justified; evaluated Context7, Semble, Serena, CodeGraph, Headroom
+
+Checkpoint:
+  complete
+`
+	missing := missingVisibleAuditTokens(visible)
+	if len(missing) == 0 {
+		t.Fatal("visible output omitting Repository and Context Placement must fail the visible contract")
+	}
+	for _, absent := range []string{"repository", "context placement"} {
+		found := false
+		for _, m := range missing {
+			if m == absent {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("visible contract must flag %q as missing, got %v", absent, missing)
+		}
+	}
+
+	complete := `Repository
+  starter/template, TanStack Start + React + shadcn
+
+Context Placement
+  screen creation → REUSE
+
+Artifact Decisions
+  NO_ACTION
+
+Tool / Capability Assessment
+  ecosystem: go, node
+  productivity: rg, fd, jq, RTK NOT_JUSTIFIED
+  provider: none justified
+
+Checkpoint
+  complete
+`
+	if missing := missingVisibleAuditTokens(complete); len(missing) > 0 {
+		t.Fatalf("complete visible output must satisfy the contract, missing %v", missing)
+	}
+}
+
+// TestContextPlacementEvidenceStructural pins the Context Placement persisted
+// evidence contract (§11): a bare {"decision":"NO_ACTION"} record never
+// demonstrates Context Placement; a record identifiable as the
+// context_placement stage/type with subject, verdict, and reason/evidence
+// does. The project-native artifact/action shape is accepted too.
+func TestContextPlacementEvidenceStructural(t *testing.T) {
+	insufficient := []byte(`{"decision":"NO_ACTION"}`)
+	if err := contextPlacementEvidence(insufficient); err == nil {
+		t.Fatal("bare NO_ACTION decision must not satisfy Context Placement evidence")
+	}
+
+	valid := []byte(`{"stage":"context_placement","subject":"screen-creation","decision":"REUSE","reason":"existing AGENTS guidance covers screen creation"}`)
+	if err := contextPlacementEvidence(valid); err != nil {
+		t.Fatalf("structural context_placement record must satisfy evidence: %v", err)
+	}
+
+	native := []byte("{\"type\":\"context_placement\",\"artifact\":\"docs/ai/index.md\",\"action\":\"REUSE\",\"evidence\":\"repeated onboarding questions\"}\n")
+	if err := contextPlacementEvidence(native); err != nil {
+		t.Fatalf("project-native context_placement record must satisfy evidence: %v", err)
+	}
+
+	if err := contextPlacementEvidence([]byte("")); err == nil {
+		t.Fatal("empty decisions.jsonl must not satisfy Context Placement evidence")
+	}
+}
+
+// TestBoilerplateAssessmentStructural pins the Boilerplate Assessment
+// persisted evidence contract (§12): a starter/boilerplate/template primary
+// kind without a structured assessment fails; the assessment with all
+// required dimensions (each allowed to report not_found) passes.
+func TestBoilerplateAssessmentStructural(t *testing.T) {
+	starterNoAssessment := `kind:
+  primary: starter
+  confidence: 0.9
+`
+	if kind := profilePrimaryKind(starterNoAssessment); !kindRequiresBoilerplate(kind) {
+		t.Fatalf("primary kind %q must require the boilerplate assessment", kind)
+	}
+	if missing := boilerplateAssessmentGaps(starterNoAssessment); len(missing) == 0 {
+		t.Fatal("starter profile without boilerplate_assessment must fail")
+	}
+
+	assessed := `kind:
+  primary: starter
+  confidence: 0.9
+boilerplate_assessment:
+  extension_points:
+    status: found
+  editable_boundaries:
+    status: found
+  generated_files:
+    status: found
+  feature_addition_workflow:
+    status: covered
+  upgrade_strategy:
+    status: not_found
+`
+	if missing := boilerplateAssessmentGaps(assessed); len(missing) > 0 {
+		t.Fatalf("full boilerplate assessment must pass, missing dimensions %v", missing)
+	}
+
+	application := `kind:
+  primary: application
+  confidence: 0.9
+`
+	if kind := profilePrimaryKind(application); kindRequiresBoilerplate(kind) {
+		t.Fatalf("primary kind %q must not require the boilerplate assessment", kind)
 	}
 }
