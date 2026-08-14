@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Every entry below is cross-checked against the repository commit history; the **Covered commits** line under each release lists the commits that introduced the described behavior. Release tags follow the goreleaser `v*` filter (`goreleaser.yml` → `release`). The V1 close is additionally checkpointed by `v1.0.0-facts` and `v1.0.0-sync-contract`; the final `v1.0.0` tag marks the archived, verified release.
 
+## [v1.2.0] - 2026-08-13
+
+Pattern & Exemplar preservation per `OPENCODE_AGENT_READY_PATTERN_EXEMPLAR_GAP_FIX.md`: Agent-Ready now indexes canonical exemplars and stable project patterns so future implementations stay consistent with the repository's architecture and design, instead of ending `NO_ACTION` on example-rich repositories.
+
+**Covered commits**: `d0b86bc`, `9123151`
+
+### Added
+
+- **Pattern & Exemplar Analysis** — `repository-analysis` evaluates repeated implementations: activation criteria (repeated intents, example-rich boilerplate, UI-rich composition, repeated repository-specific shapes) and when to skip; canonical exemplar candidates with recorded reasons; avoid/exclusions for legacy/deprecated/experimental/generated; design-consistency evidence for UI-rich repositories with an `UNKNOWN` fallback (never generic framework knowledge); a context budget of one primary candidate plus at most one secondary example; no aggressive auto-learning (doubt → `NO_CHANGE`/`ASK_USER`). The optional `pattern_exemplar_analysis` block is persisted in the repository profile when assessed or partial (`9123151`).
+- **Canonical exemplar catalog and pattern reference artifacts** — `artifact-design` may propose `docs/ai/canonical-examples.yaml` (or the repository's equivalent location) and `docs/ai/patterns/<intent>.md` / `docs/patterns/<intent>.md` using only the existing CREATE/UPDATE/REUSE/NO_ACTION verdicts; catalogs stay compact, patterns are keyed by repository intent (never by framework), design consistency derives from semantic primitives (never literal class copying), AGENTS.md remains a compact router, and a pattern never justifies a skill by itself (`9123151`).
+- **NO_ACTION gate on pattern/exemplar coverage** — the orchestrator requires `pattern/exemplar coverage evaluated when applicable` in the pre-NO_ACTION checklist and summarizes a `Patterns & Exemplars` subsection in Repository/Artifact Decisions when the analysis applies (`9123151`).
+- **Selective canonical sync** — `incremental-evolution` reassesses only affected canonical catalog/pattern entries when a changed path belongs to a recorded exemplar, removes one, changes its status, or introduces a clearly new repeated intent; never a full re-audit (`9123151`).
+- **Fixture and oracle coverage** — `fixture-q` gained three dashboard exemplars (`default`, `finance`, `operations`), a marked legacy example, a shared `DashboardShell` and theme tokens; driven cohorts now cover CREATE (missing catalog), REUSE (prepared catalog injected at runtime, kept unchanged) and `not_applicable` (small repo with no repeated implementations) (`9123151`).
+
+### Changed
+
+- **Spec docs replaced** — `OPENCODE_AGENT_READY_SURGICAL_OUTPUT_TEST_FIX.md` (implemented in v1.1.1) superseded by `OPENCODE_AGENT_READY_PATTERN_EXEMPLAR_GAP_FIX.md` (`d0b86bc`).
+
 ## [v1.1.1] - 2026-08-12
 
 Surgical output-contract test fix per `OPENCODE_AGENT_READY_SURGICAL_OUTPUT_TEST_FIX.md`: the driven audit and fixture oracles no longer let persisted state satisfy the visible output contract, and the placement/boilerplate assertions are structural.
@@ -106,6 +124,7 @@ Initial public release: CLI foundation, docs, and installer.
 
 ---
 
+[v1.2.0]: https://github.com/JhonMA82/agent-ready/releases/tag/v1.2.0
 [v1.1.1]: https://github.com/JhonMA82/agent-ready/releases/tag/v1.1.1
 [v1.1.0]: https://github.com/JhonMA82/agent-ready/releases/tag/v1.1.0
 [v1.0.0]: https://github.com/JhonMA82/agent-ready/releases/tag/v1.0.0
