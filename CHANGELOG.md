@@ -8,6 +8,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Every entry below is cross-checked against the repository commit history; the **Covered commits** line under each release lists the commits that introduced the described behavior. Release tags follow the goreleaser `v*` filter (`goreleaser.yml` → `release`). The V1 close is additionally checkpointed by `v1.0.0-facts` and `v1.0.0-sync-contract`; the final `v1.0.0` tag marks the archived, verified release.
 
+## [Unreleased]
+
+## [v1.2.1] - 2026-08-13
+
+Three final V1 corrections per `OPENCODE_AGENT_READY_THREE_FINAL_FIXES.md`: decision definitions aligned with actual behavior, Pattern & Exemplar status always persisted, and the TanStack fixture no longer blocks repository-specific dashboard skills.
+
+**Covered commits**: `20ee58f`, `c37f983`, `bb858a4`
+
+### Added
+
+- **Decision-definition content lock** — a content test asserts that `audit-flow` defines `REUSE` with coverage beyond an existing skill plus context placement, and `NO_ACTION` as completing all applicable assessments; neither can regress to an existing-skill-only or skill-score semantics (`bb858a4`).
+- **Root project rules** — `AGENTS.md` documents the delivery gate (mandatory `version-and-release` before any commit/push/PR/tag/release), the release convention, and the sequential root-spec convention (`20ee58f`).
+
+### Changed
+
+- **Spec docs replaced** — `OPENCODE_AGENT_READY_PATTERN_EXEMPLAR_GAP_FIX.md` superseded by `OPENCODE_AGENT_READY_THREE_FINAL_FIXES.md` (`c37f983`).
+
+### Fixed
+
+- **REUSE / NO_ACTION definitions aligned** — `REUSE` now means existing guidance, artifact, skill, pattern, reference, or deterministic helper covers the need AND its current context placement is appropriate (no longer only an existing skill); `NO_ACTION` requires no justified artifact change, no justified context-placement transformation, and all applicable assessments complete (Context Placement, Tool / Capability, Pattern & Exemplar, Boilerplate) instead of only the tool/capability assessment (`bb858a4`).
+- **Pattern & Exemplar status always persisted** — `repository-analysis` now mandates `pattern_exemplar_analysis` with exactly one status (`not_applicable` | `assessed` | `partial`) whenever applicability is evaluated; `not_applicable` means "evaluated and not relevant to this repository", never "analysis skipped", and persists compactly with no unnecessary lists (`bb858a4`).
+- **TanStack fixture no longer blocks repository-specific dashboard skills** — the driven fixture drops the blanket `dashboard` path prohibition while still rejecting pattern-only and generic skills (`react`/`tanstack`/`shadcn`/`best-practices` remain rejected); a repository-specific workflow skill such as `add-dashboard-screen` stays allowed when the rubric justifies it, and the rubric still controls whether a specific skill is necessary (`bb858a4`).
+
 ## [v1.2.0] - 2026-08-13
 
 Pattern & Exemplar preservation per `OPENCODE_AGENT_READY_PATTERN_EXEMPLAR_GAP_FIX.md`: Agent-Ready now indexes canonical exemplars and stable project patterns so future implementations stay consistent with the repository's architecture and design, instead of ending `NO_ACTION` on example-rich repositories.
@@ -124,6 +147,7 @@ Initial public release: CLI foundation, docs, and installer.
 
 ---
 
+[v1.2.1]: https://github.com/JhonMA82/agent-ready/releases/tag/v1.2.1
 [v1.2.0]: https://github.com/JhonMA82/agent-ready/releases/tag/v1.2.0
 [v1.1.1]: https://github.com/JhonMA82/agent-ready/releases/tag/v1.1.1
 [v1.1.0]: https://github.com/JhonMA82/agent-ready/releases/tag/v1.1.0
