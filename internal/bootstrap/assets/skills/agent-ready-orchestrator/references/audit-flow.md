@@ -25,9 +25,9 @@ The stage machine registers these names internally: exploration_plan, repository
 |---|---|
 | CREATE | Rubric-scored candidate with evidence; author with skill-creator |
 | UPDATE | Revise an existing skill; changed evidence only |
-| REUSE | Existing guidance/artifact/skill covers the need AND its current context placement is appropriate |
+| REUSE | Existing guidance, artifact, skill, pattern, reference, or deterministic helper already covers the need AND its current context placement is appropriate |
 | REMOVE | Sync-only scope; lifecycle approval flows (MERGE/DEPRECATE/REMOVE) are out of scope |
-| NO_ACTION | No justified artifact change remains AND no context-placement transformation is justified AND tool/capability assessment is complete |
+| NO_ACTION | No justified artifact change remains AND no context-placement transformation is justified AND all applicable assessments are complete |
 | ASK_USER | Stop and request missing context |
 
 ## Ordering

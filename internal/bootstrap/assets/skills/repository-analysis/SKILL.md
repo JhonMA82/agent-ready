@@ -26,7 +26,13 @@ Run when the orchestrator starts exploration, when a new finding needs classific
 
 ## Pattern & Exemplar Analysis
 
-Evaluate this analysis when there is evidence of: multiple implementations of the same intent; boilerplate/starter/template with example content; a UI-rich application with repeated screen/component composition; or a repeated repository-specific implementation shape. Skip it for small scripts, single-screen apps, libraries with no repeated implementation flows, and empty starters.
+Evaluate this analysis when there is evidence of: multiple implementations of the same intent; boilerplate/starter/template with example content; a UI-rich application with repeated screen/component composition; or a repeated repository-specific implementation shape. Skip the deep analysis for small scripts, single-screen apps, libraries with no repeated implementation flows, and empty starters — but always evaluate applicability and persist its verdict.
+
+Applicability must always be evaluated and persisted: whenever Pattern & Exemplar applicability has been evaluated, `repository_profile` MUST include `pattern_exemplar_analysis` with exactly one status:
+
+- `not_applicable` — no meaningful repeated implementations, no example-rich boilerplate content, and no repeated repository-specific implementation shape. This means applicability was evaluated and the feature is not relevant to this repository — never that the analysis was skipped. Persist it compactly (`status: not_applicable`, no unnecessary lists); no large user-facing block is required.
+- `assessed` — analysis completed with sufficient evidence.
+- `partial` — analysis applies but evidence remains incomplete/ambiguous.
 
 The analysis answers:
 1. Are there repeated implementations of the same intent?
@@ -132,7 +138,7 @@ boilerplate_assessment:
   canonical_customization_examples: []
 ```
 
-When the Pattern & Exemplar Analysis is assessed or partial, the profile MUST also carry this optional block:
+Whenever Pattern & Exemplar applicability has been evaluated, the profile MUST carry this block with exactly one status (`not_applicable` | `assessed` | `partial`):
 
 ```yaml
 pattern_exemplar_analysis:
@@ -160,4 +166,4 @@ pattern_exemplar_analysis:
     reason:
 ```
 
-The Boilerplate Assessment demonstrates that the evaluation occurred; it creates no artifacts. Before the audit completes, persist the repository profile to `.agent-ready/state/repository-profile.yaml` — kind.primary, kind.confidence, topology, boilerplate_assessment when it applies, and pattern_exemplar_analysis when assessed or partial — and reference it in decisions.jsonl; Go fact helpers only read this file. Findings carry FACT/INFERENCE/UNKNOWN labels, every decision-relevant finding has a confidence, and every Tool / Capability Assessment claim cites evidence and a reason.
+The Boilerplate Assessment demonstrates that the evaluation occurred; it creates no artifacts. Before the audit completes, persist the repository profile to `.agent-ready/state/repository-profile.yaml` — kind.primary, kind.confidence, topology, boilerplate_assessment when it applies, and pattern_exemplar_analysis with its status whenever applicability was evaluated — and reference it in decisions.jsonl; Go fact helpers only read this file. Findings carry FACT/INFERENCE/UNKNOWN labels, every decision-relevant finding has a confidence, and every Tool / Capability Assessment claim cites evidence and a reason.

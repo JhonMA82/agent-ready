@@ -448,6 +448,15 @@ func TestOrchestratorAnalysisContent(t *testing.T) {
 			t.Fatalf("audit-flow missing %q", marker)
 		}
 	}
+	// THREE_FINAL_FIXES: REUSE must cover guidance/artifact/pattern coverage
+	// plus placement, and NO_ACTION must complete all applicable assessments —
+	// neither may depend on an existing skill or a skill score alone.
+	if !strings.Contains(auditFlow, "Existing guidance, artifact, skill, pattern, reference, or deterministic helper") {
+		t.Fatal("audit-flow REUSE must define coverage beyond an existing skill, with context placement")
+	}
+	if !strings.Contains(auditFlow, "all applicable assessments are complete") {
+		t.Fatal("audit-flow NO_ACTION must complete all applicable assessments, not depend on a skill score")
+	}
 	resume := readAsset(t, "assets/skills/agent-ready-orchestrator/references/resume-rules.md")
 	for _, marker := range []string{"checkpoint", "hash changed", "NO_ACTION"} {
 		if !strings.Contains(resume, marker) {

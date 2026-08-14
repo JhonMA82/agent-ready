@@ -258,7 +258,8 @@ func assertCohortOracle(t *testing.T, mode, lower string, after map[string]strin
 		// identified, and the legacy example was excluded; the fixture has no
 		// catalog, so the audit must CREATE one — or explicitly REUSE
 		// existing guidance when the evidence says so. Skills must never be
-		// created for patterns (§18).
+		// created for patterns (§18); a repository-specific workflow skill
+		// (e.g. add-dashboard-screen) stays allowed when the rubric justifies it.
 		if !strings.Contains(lower, "pattern") || !containsAny(lower, []string{"exemplar", "canonical"}) {
 			t.Fatal("tanstack-starter must evidence pattern/exemplar analysis")
 		}
@@ -273,7 +274,7 @@ func assertCohortOracle(t *testing.T, mode, lower string, after map[string]strin
 				t.Fatal("tanstack-starter must CREATE docs/ai/canonical-examples.yaml or explicitly REUSE existing guidance")
 			}
 		}
-		rejectSkillPaths(t, after, []string{"dashboard", "pattern"})
+		rejectSkillPaths(t, after, []string{"pattern"})
 	case "tanstack-starter-prepared":
 		// §27 oracle: the injected catalog must survive unchanged and the
 		// audit must reuse existing guidance (REUSE or NO_ACTION) — never
@@ -293,7 +294,7 @@ func assertCohortOracle(t *testing.T, mode, lower string, after map[string]strin
 				t.Fatalf("tanstack-starter-prepared created a duplicate canonical catalog: %s", path)
 			}
 		}
-		rejectSkillPaths(t, after, []string{"dashboard", "pattern"})
+		rejectSkillPaths(t, after, []string{"pattern"})
 	case "small-repo":
 		// §28 oracle: no repeated implementations — the persisted profile
 		// must record pattern_exemplar_analysis: not_applicable and no
