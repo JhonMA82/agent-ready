@@ -74,6 +74,10 @@ tasks and routes to more specific context.
 - `src/routes/screens.tsx` — list screen with filters and pagination.
 - `src/routes/index.tsx` — dashboard summary screen.
 - `src/features/screens/` — feature module layout to copy for new features.
+- `src/routes/dashboard/` — dashboard screens (default, finance, operations)
+  compose through `DashboardShell` with theme tokens; `legacy.tsx` is
+  deprecated and must not be copied. For new UI/features, select the closest
+  canonical example before implementation.
 
 ## Validation commands
 

@@ -44,6 +44,7 @@ Before returning from `sync`, confirm every item:
 - Apply the Tool Budget minimal-set ordering: rg + fd + jq; then + ast-grep when structural search is needed; then Semble OR Serena when semantic retrieval or navigation is justified; CodeGraph only when the graph capability adds clear value; Headroom only when context compression remains a measured problem. Heavier tools need explicit justification; the final set stays model-owned.
 - Coverage is not sufficient to conclude REUSE: evaluate context placement before final artifact decisions.
 - Existing coverage alone is not sufficient for REUSE or NO_ACTION: existing guidance must also pass the Context Placement Gate.
+- When repeated implementations or example-rich boilerplates are detected, require repository-analysis to evaluate Pattern & Exemplar coverage before final artifact decisions.
 
 ## Output Contract
 Return the mode outcome, the recorded decisions with evidence and confidence, the Tool / Capability Assessment naming ecosystem, productivity, and provider, and the checkpoint stage. Every audit output MUST demonstrate, with labeled evidence:
@@ -62,9 +63,27 @@ Before returning `NO_ACTION`, all of the following must hold:
 repository kind classified
 relevant existing guidance evaluated
 context placement evaluated
+pattern/exemplar coverage evaluated when applicable
 no placement optimization justified
 tool assessment completed
 no artifact candidate justified
+```
+
+When the Pattern & Exemplar Analysis applies, summarize it within the Repository/Artifact Decisions output as a `Patterns & Exemplars` subsection, for example:
+
+```text
+Patterns & Exemplars
+  repeated dashboard patterns detected
+  canonical examples are not indexed
+  CREATE canonical-examples
+```
+
+or:
+
+```text
+Patterns & Exemplars
+  already covered by docs/ai/canonical-examples.yaml
+  REUSE
 ```
 
 Existing coverage alone is not sufficient for REUSE or NO_ACTION. Existing guidance must also pass the Context Placement Gate.

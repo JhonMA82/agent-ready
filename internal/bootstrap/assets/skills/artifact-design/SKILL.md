@@ -47,5 +47,23 @@ ASK_USER → stop and ask
 
 The rubric threshold >= 85 only controls the creation of new skills. It never blocks the placement transformations COMPACT, EXTRACT_TO_SKILL, MOVE_TO_REFERENCE, or REPLACE_WITH_SCRIPT: those route through their own transformations above, not through skill creation.
 
+## Optional Artifact Types: Canonical Exemplar Catalog & Pattern Reference
+
+Two optional artifact types may be proposed when repository-analysis's Pattern & Exemplar evidence supports them. They use only the existing verdicts — CREATE, UPDATE, REUSE, NO_ACTION; no new verdict exists for them.
+
+### Canonical exemplar catalog
+
+`CREATE` a `canonical exemplar catalog` only when: multiple useful examples exist; they represent distinct recurring intents; there is no adequate existing catalog; and future work would otherwise need repeated exploration. Recommended location `docs/ai/canonical-examples.yaml` — only if it fits the project structure; if the repository already has an equivalent location, reuse it. Never impose the path universally. The catalog must stay compact and be derived from the current repository (never copied from another project): schemaVersion; selectionRules (select the closest current example by intent; inspect no more than two examples unless more evidence is required; record intentional deviations; do not use legacy/deprecated entries as new-work references); examples with path/useFor/status; avoid entries with reasons.
+
+### Pattern reference
+
+`CREATE` a `pattern reference` only when: a stable non-trivial pattern repeats; the pattern is repository-specific; future work would benefit from explicit guidance; and the information is not already adequately documented. Use `docs/ai/patterns/<intent>.md` or `docs/patterns/<intent>.md` according to the existing structure. Patterns are keyed by repository intent, never by framework: `dashboard-screen.md`, `entity-management.md`, `ratatui-page.md`, `domain-service.md` are correct; `react-pattern.md`, `tailwind-pattern.md`, `rust-pattern.md` are not — and only when the evidence justifies it. Content describes only what is inferred from the repository: Use when; Canonical examples; Expected structure; Repository-specific invariants; Design/interaction expectations when applicable; Required states; Validation; Known deviations/avoidances. It must not become a framework tutorial.
+
+### Design consistency and placement rules
+
+- Design consistency derives from existing semantic primitives and composition patterns, never from literal duplication of classes or component markup. Correct: use existing semantic theme tokens; use the existing dashboard shell and spacing rhythm; follow the canonical responsive collapse pattern. Incorrect: copy these 43 Tailwind classes from dashboard X.
+- When a catalog or pattern is created, do not copy its full content into `AGENTS.md`. At most add one compact router reference line when AGENTS.md is the right router (for example "For new UI/features, select the closest canonical example and applicable project pattern before implementation."); the detail stays on-demand.
+- Creating a pattern does not justify creating a skill: a pattern records how this kind of implementation is shaped in the repo; a skill records how to execute a repeatable non-trivial workflow. `docs/ai/patterns/dashboard-screen.md` can exist without `.opencode/skills/add-dashboard-screen/`; a skill is only justified when it meets the existing rubric.
+
 ## Output Contract
 Return the decision with its evidence and confidence, plus the recorded state entry; never a bare artifact count.

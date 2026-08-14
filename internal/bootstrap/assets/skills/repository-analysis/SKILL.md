@@ -14,6 +14,7 @@ Run when the orchestrator starts exploration, when a new finding needs classific
 - Classify repository kind when evidence supports it: primary kind from {application, library, cli, starter, boilerplate, template, infrastructure, mixed} with secondary kinds and a confidence score (FACT when evidenced, INFERENCE otherwise). `monorepo` is a topology fact, never a kind: express it as `topology.monorepo: true`.
 - When kind.primary is boilerplate/starter/template, run the Boilerplate Assessment: extension points; editable boundaries (what downstream users should edit and should not edit); generated files; feature addition workflow; variants/presets; scaffolding; upgrade/update strategy; canonical customization examples. The assessment never creates artifacts by itself; it only demonstrates that the evaluation happened.
 - Ask the boilerplate placement questions: which instructions must be always-on; which workflows should become on-demand skills; which examples should become references.
+- When evidence shows repeated implementations of the same intent, example-rich boilerplate/starter/template content, a UI-rich application with repeated screen/component composition, or a repeated repository-specific implementation shape, run the Pattern & Exemplar Analysis below. Do not run it deeply in repositories without repeated examples: small script, single-screen app, library with no repeated implementation flows, empty starter.
 
 ## Execution Steps
 1. Gather facts from deterministic sources: repository files and the JSON-fact helpers (inspect, state, changes, checkpoint status).
@@ -22,6 +23,64 @@ Run when the orchestrator starts exploration, when a new finding needs classific
 4. Build the repository profile per the `references/inventory-facts.md` contract: kind (primary/secondary/confidence), topology (monorepo, workspace_count), ecosystems, central frameworks, existing agent assets, context placement estimate, boilerplate assessment when it applies, tool assessment.
 5. Record the labeled evidence set with per-finding confidence in state.
 6. Feed the Tool / Capability Assessment: include tool/capability facts (`tools status`, `tools recommend`) in the labeled evidence set; every assessment claim cites evidence and a reason.
+
+## Pattern & Exemplar Analysis
+
+Evaluate this analysis when there is evidence of: multiple implementations of the same intent; boilerplate/starter/template with example content; a UI-rich application with repeated screen/component composition; or a repeated repository-specific implementation shape. Skip it for small scripts, single-screen apps, libraries with no repeated implementation flows, and empty starters.
+
+The analysis answers:
+1. Are there repeated implementations of the same intent?
+2. Which ones represent current architecture?
+3. Which are legacy/deprecated/experimental?
+4. Which examples best represent distinct use cases?
+5. What stable implementation patterns repeat across them?
+6. If UI-rich, what stable design/UX patterns are evidenced?
+7. Is this knowledge already persisted somewhere?
+8. Would indexing it reduce future exploration and inconsistency?
+
+It produces evidence only — no artifacts. artifact-design decides CREATE/UPDATE/REUSE/NO_ACTION from this evidence.
+
+### Canonical exemplar candidates
+
+An example may be a canonical exemplar candidate when it is: current architecture; complete enough to learn from; represents a recurring intent; not legacy/deprecated; not a known exception. Never pick simply the largest file, the newest file, or the first matching file. Record the reason for every candidate:
+
+```yaml
+canonical_candidate:
+  id: finance-dashboard
+  intent:
+    - KPI hierarchy
+    - chart-heavy dashboard
+  path: src/...
+  status: current
+  evidence:
+    - uses current layout primitives
+    - uses semantic theme tokens
+    - follows current route structure
+```
+
+### Anti-examples / exclusions
+
+Also detect, when important: legacy, deprecated, migration-only, experimental, generated, protected primitive, known exception.
+
+```yaml
+avoid:
+  - path: src/.../legacy
+    reason: obsolete implementation pattern
+```
+
+Future work must not copy old code accidentally just because it exists.
+
+### UI-rich repositories: design consistency
+
+When the repository is clearly UI-rich, also evaluate evidence on: layout/composition; spacing/density; typography hierarchy; semantic theme/token usage; responsive behavior; loading/empty/error states; interaction behavior; accessibility patterns; component composition; chart/table/form conventions when present. Do not invent a design system; record only repeated, demonstrable repository patterns. When a dimension lacks sufficient evidence, record `UNKNOWN`; never fill it with generic Tailwind, shadcn, or React knowledge.
+
+### Context budget
+
+Do not read complete implementations. Use progressive exploration: find candidate cluster → inspect structure/search results → choose representative candidates → read smallest useful portions → compare → expand only if evidence is insufficient. By default: 1 primary candidate + maximum 1 secondary comparison — no more than two examples total unless there is an explicit reason to read more.
+
+### No aggressive auto-learning
+
+Do not promote every new file to canonical. Promoting a new example requires evidence: current architecture; complete implementation; distinct or better representative intent; not experimental; not legacy. When in doubt: `NO_CHANGE` or `ASK_USER`.
 
 ## Output Contract
 Return the labeled evidence set and the repository profile:
@@ -73,4 +132,32 @@ boilerplate_assessment:
   canonical_customization_examples: []
 ```
 
-The Boilerplate Assessment demonstrates that the evaluation occurred; it creates no artifacts. Before the audit completes, persist the repository profile to `.agent-ready/state/repository-profile.yaml` — kind.primary, kind.confidence, topology, and boilerplate_assessment when it applies — and reference it in decisions.jsonl; Go fact helpers only read this file. Findings carry FACT/INFERENCE/UNKNOWN labels, every decision-relevant finding has a confidence, and every Tool / Capability Assessment claim cites evidence and a reason.
+When the Pattern & Exemplar Analysis is assessed or partial, the profile MUST also carry this optional block:
+
+```yaml
+pattern_exemplar_analysis:
+  status: <not_applicable | assessed | partial>
+  repeated_intents: []
+  canonical_candidates: []
+  avoid_examples: []
+  stable_patterns: []
+  design_consistency:
+    applicable: <true | false>
+    observed:
+      layout: []
+      spacing_density: []
+      typography: []
+      theme_tokens: []
+      responsive: []
+      states: []
+      interactions: []
+      accessibility: []
+  existing_persistence:
+    canonical_catalog: <path | null>
+    pattern_docs: []
+  persistence_gap:
+    exists: <true | false>
+    reason:
+```
+
+The Boilerplate Assessment demonstrates that the evaluation occurred; it creates no artifacts. Before the audit completes, persist the repository profile to `.agent-ready/state/repository-profile.yaml` — kind.primary, kind.confidence, topology, boilerplate_assessment when it applies, and pattern_exemplar_analysis when assessed or partial — and reference it in decisions.jsonl; Go fact helpers only read this file. Findings carry FACT/INFERENCE/UNKNOWN labels, every decision-relevant finding has a confidence, and every Tool / Capability Assessment claim cites evidence and a reason.

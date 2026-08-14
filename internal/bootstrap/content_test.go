@@ -919,6 +919,52 @@ func TestFinalContextFixOutputContracts(t *testing.T) {
 	}
 }
 
+// TestPatternExemplarGapContent locks the Pattern & Exemplar preservation
+// patch (OPENCODE_AGENT_READY_PATTERN_EXEMPLAR_GAP_FIX): repository-analysis
+// carries the analysis with its context budget and the optional
+// pattern_exemplar_analysis profile block; the orchestrator gates NO_ACTION
+// on pattern/exemplar coverage; artifact-design may propose the two optional
+// artifact types with existing verdicts only; incremental sync reassesses
+// only affected canonical catalog/pattern entries.
+func TestPatternExemplarGapContent(t *testing.T) {
+	analysis := readAsset(t, "assets/skills/repository-analysis/SKILL.md")
+	for _, marker := range []string{
+		"Pattern & Exemplar", "canonical exemplar", "legacy/deprecated",
+		"no more than two examples", "maximum 1 secondary",
+	} {
+		if !strings.Contains(analysis, marker) {
+			t.Fatalf("repository-analysis missing Pattern & Exemplar marker %q", marker)
+		}
+	}
+	for _, marker := range []string{"pattern_exemplar_analysis", "not_applicable"} {
+		if !strings.Contains(analysis, marker) {
+			t.Fatalf("repository-analysis missing profile block marker %q", marker)
+		}
+	}
+
+	orch := readAsset(t, "assets/skills/agent-ready-orchestrator/SKILL.md")
+	if !strings.Contains(orch, "pattern/exemplar coverage evaluated when applicable") {
+		t.Fatal("orchestrator NO_ACTION checklist must require pattern/exemplar coverage evaluation")
+	}
+	if !strings.Contains(orch, "Pattern & Exemplar coverage") {
+		t.Fatal("orchestrator missing the Pattern & Exemplar coverage principle")
+	}
+
+	design := readAsset(t, "assets/skills/artifact-design/SKILL.md")
+	for _, marker := range []string{"canonical exemplar catalog", "pattern reference"} {
+		if !strings.Contains(design, marker) {
+			t.Fatalf("artifact-design missing optional artifact type %q", marker)
+		}
+	}
+
+	evolution := readAsset(t, "assets/skills/incremental-evolution/SKILL.md")
+	for _, marker := range []string{"canonical exemplar", "reassess only the affected"} {
+		if !strings.Contains(evolution, marker) {
+			t.Fatalf("incremental-evolution missing canonical sync rule %q", marker)
+		}
+	}
+}
+
 // TestNoStaleToolScopePhrase locks the audit-evidence-gates stale-phrase
 // cleanup across the whole embedded asset tree: neither "tool management is
 // out of scope" nor its equivalent "Tool Manager is out of scope" may appear

@@ -30,6 +30,15 @@ Run when `/agent-ready sync` is dispatched or when `changes` reports paths chang
 6. Decide per affected item: update it, reuse it, or leave it unchanged.
 7. Apply the selective updates, record each with its justifying ChangeSet entry, and record the reassessment (or skip) decision in state.
 
+## Canonical Exemplar & Pattern Sync
+
+If a changed path belongs to a recorded canonical exemplar, removes one, changes its status, or introduces a clearly new repeated implementation intent, reassess only the affected canonical catalog/pattern entries. Never re-audit the whole repository.
+
+Example:
+- new dashboard added → compare with existing dashboard intents
+- if same intent: NO_CHANGE
+- if new canonical intent: UPDATE catalog
+
 ## Mandatory Final Checklist
 Before returning from sync, verify:
 - [ ] ChangeSet and checkpoint stage facts are present.
